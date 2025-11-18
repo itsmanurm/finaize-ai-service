@@ -26,6 +26,7 @@ export const SummarizeSchema = z.object({
   items: z.array(ItemSchema).min(1),
   classifyMissing: z.boolean().optional().default(true),
   currency: z.enum(['ARS','USD']).optional().default('ARS'),
-  periodLabel: z.string().optional()
+  periodLabel: z.string().optional(),
+  useAI: z.boolean().optional().default(false)
 });
 export type SummarizeInput = z.infer<typeof SummarizeSchema>;

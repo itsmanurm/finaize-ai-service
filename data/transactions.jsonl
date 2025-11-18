@@ -1,0 +1,41 @@
+{"ts":"2025-11-18T02:07:51.743Z","amount":1200,"currency":"ARS","merchant":"","description":"Agrega un gasto de 1200 en supermercado Carrefour","category":"Supermercado","confidence":0.92,"dedupHash":"c3471b9a308a29a03d0ba6ef572d8b507e15c8bf"}
+{"date":"2025-01-15","amount":1200,"currency":"ARS","merchant":"Carrefour","category":"supermercado","description":"Compra supermercado Carrefour"}
+{"date":"2025-02-10","amount":3500,"currency":"ARS","merchant":"Edenor","category":"servicios","description":"Factura de luz Edenor"}
+{"date":"2025-03-05","amount":800,"currency":"ARS","merchant":"Megatlón","category":"gimnasio","description":"Pago mensual gimnasio Megatlón"}
+{"date":"2025-04-20","amount":2500,"currency":"ARS","merchant":"Mercado Libre","category":"ecommerce","description":"Compra online Mercado Libre"}
+{"date":"2025-05-12","amount":1800,"currency":"ARS","merchant":"La Cabrera","category":"restaurante","description":"Cena en La Cabrera"}
+{"date":"2025-06-18","amount":2200,"currency":"ARS","merchant":"Sushi Club","category":"restaurante","description":"Almuerzo Sushi Club"}
+{"date":"2025-07-03","amount":5000,"currency":"ARS","merchant":"Juan","category":"transferencia","description":"Transferencia a Juan"}
+{"date":"2025-08-25","amount":900,"currency":"ARS","merchant":"Netflix","category":"entretenimiento","description":"Suscripción Netflix"}
+{"date":"2025-09-14","amount":3000,"currency":"ARS","merchant":"Coto","category":"supermercado","description":"Compra supermercado Coto"}
+{"date":"2025-10-30","amount":1500,"currency":"ARS","merchant":"Starbucks","category":"cafetería","description":"Café Starbucks"}
+{"date":"2025-11-05","amount":2000,"currency":"ARS","merchant":"Burger King","category":"restaurante","description":"Cena Burger King"}
+{"date":"2025-01-20","amount":950,"currency":"ARS","merchant":"Subte","category":"transporte","description":"Carga SUBE"}
+{"date":"2025-02-14","amount":1200,"currency":"ARS","merchant":"Farmacity","category":"salud","description":"Compra farmacia"}
+{"date":"2025-02-28","amount":4000,"currency":"ARS","merchant":"UADE","category":"educacion","description":"Cuota universidad"}
+{"date":"2025-03-10","amount":1800,"currency":"ARS","merchant":"Jumbo","category":"supermercado","description":"Compra supermercado Jumbo"}
+{"date":"2025-03-22","amount":2200,"currency":"ARS","merchant":"Spotify","category":"entretenimiento","description":"Suscripción Spotify"}
+{"date":"2025-04-02","amount":1500,"currency":"ARS","merchant":"YPF","category":"transporte","description":"Carga combustible"}
+{"date":"2025-04-15","amount":3200,"currency":"ARS","merchant":"OSDE","category":"salud","description":"Prepaga OSDE"}
+{"date":"2025-05-01","amount":2100,"currency":"ARS","merchant":"Garbarino","category":"ecommerce","description":"Compra online Garbarino"}
+{"date":"2025-05-18","amount":1700,"currency":"ARS","merchant":"McDonald's","category":"restaurante","description":"Almuerzo McDonald's"}
+{"date":"2025-06-05","amount":800,"currency":"ARS","merchant":"Cinemark","category":"entretenimiento","description":"Entrada cine"}
+{"date":"2025-06-22","amount":2500,"currency":"ARS","merchant":"Personal","category":"servicios","description":"Factura celular Personal"}
+{"date":"2025-07-10","amount":1100,"currency":"ARS","merchant":"Dia%","category":"supermercado","description":"Compra supermercado Dia%"}
+{"date":"2025-07-25","amount":3000,"currency":"ARS","merchant":"Uber","category":"transporte","description":"Viaje Uber"}
+{"date":"2025-08-08","amount":950,"currency":"ARS","merchant":"Open English","category":"educacion","description":"Curso inglés online"}
+{"date":"2025-08-19","amount":1200,"currency":"ARS","merchant":"Freddo","category":"cafetería","description":"Helado Freddo"}
+{"date":"2025-09-03","amount":1800,"currency":"ARS","merchant":"Havanna","category":"cafetería","description":"Café Havanna"}
+{"date":"2025-09-17","amount":2200,"currency":"ARS","merchant":"Claro","category":"servicios","description":"Factura celular Claro"}
+{"date":"2025-10-01","amount":1500,"currency":"ARS","merchant":"Easy","category":"hogar","description":"Compra ferretería Easy"}
+{"date":"2025-10-15","amount":3200,"currency":"ARS","merchant":"UADE","category":"educacion","description":"Cuota universidad"}
+{"date":"2025-10-28","amount":2100,"currency":"ARS","merchant":"Carrefour","category":"supermercado","description":"Compra supermercado Carrefour"}
+{"date":"2025-11-02","amount":1700,"currency":"ARS","merchant":"La Parolaccia","category":"restaurante","description":"Cena La Parolaccia"}
+{"date":"2025-11-12","amount":800,"currency":"ARS","merchant":"Cinemark","category":"entretenimiento","description":"Entrada cine"}
+{"date":"2025-11-16","amount":2500,"currency":"ARS","merchant":"Mercado Libre","category":"ecommerce","description":"Compra online Mercado Libre"}
+{"date":"2025-11-18","amount":1100,"currency":"ARS","merchant":"Dia%","category":"supermercado","description":"Compra supermercado Dia%"}
+{"date":"2025-11-20","amount":3000,"currency":"ARS","merchant":"Uber","category":"transporte","description":"Viaje Uber"}
+{"date":"2025-11-22","amount":950,"currency":"ARS","merchant":"Open English","category":"educacion","description":"Curso inglés online"}
+{"date":"2025-11-25","amount":1200,"currency":"ARS","merchant":"Freddo","category":"cafetería","description":"Helado Freddo"}
+{"date":"2025-11-28","amount":1800,"currency":"ARS","merchant":"Havanna","category":"cafetería","description":"Café Havanna"}
+{"date":"2025-11-30","amount":2200,"currency":"ARS","merchant":"Claro","category":"servicios","description":"Factura celular Claro"}

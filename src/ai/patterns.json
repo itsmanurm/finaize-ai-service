@@ -1,19 +1,105 @@
 [
-  { "name": "ride-hailing", "re": "(\\buber\\b|cabify|didi)", "category": "Transporte", "strength": 0.95 },
-  { "name": "fuel", "re": "(\\bypf\\b|shell|axion|puma)", "category": "Combustible", "strength": 0.95 },
-  { "name": "groceries", "re": "(\\bcoto\\b|carrefour|jumbo|disco|\\bdia\\b|vea\\b|chango\\s*mas)", "category": "Supermercado", "strength": 0.92 },
-  { "name": "pharma", "re": "(farmacity|dr\\.?\\s*ahorro|vitals|la\\s*reina|brouwer)", "category": "Salud", "strength": 0.9 },
-  { "name": "food-apps", "re": "(rappi|pedidos\\s*ya|pedidosya|mc\\s*donald|burger\\s*king|mostaza\\b)", "category": "Comidas", "strength": 0.88 },
-  { "name": "ecommerce", "re": "(mercado\\s*pago|mp\\*|mercado\\s*libre|meli\\b)", "category": "Compras", "strength": 0.85 },
+  { "name": "ride-hailing", "re": "(\\buber\\b|cabify|didi|pedi\\s*ya)", "category": "Transporte", "strength": 0.95 },
+  { "name": "fuel", "re": "(\\bypf\\b|shell|axion|puma|esso|repsol)", "category": "Combustible", "strength": 0.95 },
+  { "name": "groceries", "re": "(\\bcoto\\b|carrefour|jumbo|disco|\\bdia\\b|vea\\b|chango\\s*mas|walmart|big\\s*wal)", "category": "Supermercado", "strength": 0.92 },
+  { "name": "pharma", "re": "(farmacity|dr\\.?\\s*ahorro|vitals|la\\s*reina|brouwer|simplicity)", "category": "Salud", "strength": 0.9 },
+  { "name": "food-apps", "re": "(rappi|pedidos\\s*ya|pedidosya|mc\\s*donald|burger\\s*king|mostaza\\b|domino\\s*pizza)", "category": "Comidas", "strength": 0.88 },
+  { "name": "ecommerce", "re": "(mercado\\s*pago|mp\\*|mercado\\s*libre|meli\\b|mercadolibre)", "category": "Compras", "strength": 0.85 },
   { "name": "streaming", "re": "(netflix|spotify|youtube\\s*premium|hbo|max\\b|disney\\+|paramount\\+|prime\\s*video)", "category": "Suscripciones", "strength": 0.9 },
-  { "name": "transport-card", "re": "(\\bsube\\b|mi\\s*bondi|tren|ferrocarril|metrovias)", "category": "Transporte", "strength": 0.86 },
+  { "name": "transport-card", "re": "(\\bsube\\b|mi\\s*bondi|tren|ferrocarril|metrovias|tp\\s*ferro)", "category": "Transporte", "strength": 0.86 },
   { "name": "atm-cash", "re": "(\\bcajero\\b|\\batm\\b|extracci[oó]n|retiro\\s*efectivo)", "category": "Efectivo", "strength": 0.82 },
-  { "name": "taxes", "re": "(\\bafip\\b|arba\\b|rentas\\b|municipalidad|dgr\\b)", "category": "Impuestos", "strength": 0.92 },
+  { "name": "taxes", "re": "(\\bafip\\b|arba\\b|rentas\\b|municipalidad|dgr\\b|anses)", "category": "Impuestos", "strength": 0.92 },
   { "name": "utilities-electric", "re": "(edenor|edesur|epe\\b|edesa|epec\\b|dpec)", "category": "Servicios", "strength": 0.9 },
   { "name": "utilities-water", "re": "(aysa|aguas\\s*santafesinas|samy\\b|ass[aá])", "category": "Servicios", "strength": 0.88 },
-  { "name": "telcos", "re": "(claro\\b|personal\\b|movistar\\b|telecom\\b|fibertel|flow\\b)", "category": "Servicios", "strength": 0.9 },
-  { "name": "gaming", "re": "(steam|playstation\\s*network|psn\\b|xbox\\s*live)", "category": "Entretenimiento", "strength": 0.85 },
-  { "name": "education", "re": "(udemy|platzi|coursera|domestika|crehana)", "category": "Educación", "strength": 0.82 },
+  { "name": "telcos", "re": "(claro\\b|personal\\b|movistar\\b|telecom\\b|fibertel|flow\\b|telefonica)", "category": "Servicios", "strength": 0.9 },
+  { "name": "gaming", "re": "(steam|playstation\\s*network|psn\\b|xbox\\s*live|nintendo)", "category": "Entretenimiento", "strength": 0.85 },
+  { "name": "education", "re": "(udemy|platzi|coursera|domestika|crehana|mentor\\s*box)", "category": "Educación", "strength": 0.82 },
   { "name": "parking", "re": "(estacionamiento|playa\\s*de\\s*estacionamiento|park\\s*pay)", "category": "Transporte", "strength": 0.82 },
-  { "name": "banks-fees", "re": "(comisi[oó]n|mantenimiento\\s*de\\s*caja|cargo\\s*bancario)", "category": "Cargos bancarios", "strength": 0.9 }
+  { "name": "banks-fees", "re": "(comisi[oó]n|mantenimiento\\s*de\\s*caja|cargo\\s*bancario)", "category": "Cargos bancarios", "strength": 0.9 },
+  
+  { "name": "banco-nacion", "re": "(banc[oó]\\s*naci[oó]n|banco\\s*nacion)", "category": "Bancos", "strength": 0.98 },
+  { "name": "banco-galicia", "re": "(banco\\s*galicia|galicia\\s*bank)", "category": "Bancos", "strength": 0.98 },
+  { "name": "banco-santander", "re": "(banco\\s*santander|santander\\s*rio)", "category": "Bancos", "strength": 0.98 },
+  { "name": "banco-macro", "re": "(banco\\s*macro|macro\\s*bank)", "category": "Bancos", "strength": 0.98 },
+  { "name": "banco-icbc", "re": "(banco\\s*icbc|icbc\\s*bank)", "category": "Bancos", "strength": 0.98 },
+  { "name": "banco-ciudad", "re": "(banco\\s*ciudad|bciudad)", "category": "Bancos", "strength": 0.98 },
+  { "name": "banco-provincia", "re": "(banco\\s*provincia|bprov)", "category": "Bancos", "strength": 0.98 },
+  { "name": "banco-meridian", "re": "(banco\\s*meridian|meridian\\s*bank)", "category": "Bancos", "strength": 0.98 },
+  
+  { "name": "uala", "re": "(\\buala\\b|uala\\s*bank)", "category": "Fintech", "strength": 0.95 },
+  { "name": "brubank", "re": "(\\bbrubank\\b|brubank\\s*bank)", "category": "Fintech", "strength": 0.95 },
+  { "name": "naranja-x", "re": "(naranja\\s*x|naranjax)", "category": "Fintech", "strength": 0.95 },
+  { "name": "wilobank", "re": "(\\bwilobank\\b|wilo\\s*bank)", "category": "Fintech", "strength": 0.95 },
+  { "name": "pixie", "re": "(\\bpixie\\b|pixie\\s*bank)", "category": "Fintech", "strength": 0.95 },
+  { "name": "redebancaria", "re": "(redebancaria|cuenta\\s*dni)", "category": "Fintech", "strength": 0.95 },
+  
+  { "name": "abasto", "re": "(\\babasto\\b|abasto\\s*supermercado)", "category": "Supermercado", "strength": 0.9 },
+  { "name": "villa", "re": "(\\bvilla\\s*espinosa|villa\\s*espin)", "category": "Supermercado", "strength": 0.9 },
+  { "name": "tuesday", "re": "(\\btuesday\\s*morning|tuesday\\s*m)", "category": "Supermercado", "strength": 0.9 },
+  { "name": "cuyo", "re": "(\\bcuyo\\s*supermercado|cuyo\\s*super)", "category": "Supermercado", "strength": 0.9 },
+  { "name": "merco", "re": "(\\bmerco\\s*super|merco\\s*supermercado)", "category": "Supermercado", "strength": 0.9 },
+  
+  { "name": "d1", "re": "(\\bd1\\s*supermercado|d1\\s*super)", "category": "Supermercado", "strength": 0.9 },
+  { "name": "vidal", "re": "(\\bvidal\\s*supermercado|vidal\\s*super)", "category": "Supermercado", "strength": 0.9 },
+  
+  { "name": "farmacia-del-ahorro", "re": "(farmacia\\s*del\\s*ahorro|dr\\.?\\s*ahorro)", "category": "Salud", "strength": 0.95 },
+  { "name": "farmacity", "re": "(farmacity|farmacity\\s*online)", "category": "Salud", "strength": 0.95 },
+  { "name": "simplicity", "re": "(simplicity\\s*pharmacy|simplicity\\s*farmacia)", "category": "Salud", "strength": 0.95 },
+  
+  { "name": "mcdonalds-argentina", "re": "(mc\\s*donald|hamburguesa\\s*argentina|mcdonalds\\s*arg)", "category": "Comidas", "strength": 0.9 },
+  { "name": "burger-king-argentina", "re": "(burger\\s*king|bk\\s*argentina|hamburguesa\\s*reina)", "category": "Comidas", "strength": 0.9 },
+  { "name": "mostaza", "re": "(mostaza\\s*restaurant|mostaza\\s*burger)", "category": "Comidas", "strength": 0.9 },
+  { "name": "dominos", "re": "(domino\\s*pizza|dominos\\s*pizza)", "category": "Comidas", "strength": 0.9 },
+  { "name": "pizza-hut", "re": "(pizza\\s*hut|pizzahut)", "category": "Comidas", "strength": 0.9 },
+  { "name": "kfc-argentina", "re": "(kfc\\s*argentina|kentucky\\s*fried)", "category": "Comidas", "strength": 0.9 },
+  { "name": "burger", "re": "(\\bburger\\s*king|burger\\s*slayer|burgers\\s*argentina)", "category": "Comidas", "strength": 0.85 },
+  
+  { "name": "starbucks-argentina", "re": "(starbucks\\s*argentina|starbucks\\s*ba)", "category": "Bebidas", "strength": 0.9 },
+  { "name": "caffena", "re": "(\\bcaffena\\b|caffena\\s*coffee)", "category": "Bebidas", "strength": 0.9 },
+  { "name": "bonafide", "re": "(bonafide\\s*coffee|bonafide\\s*cafe)", "category": "Bebidas", "strength": 0.9 },
+  
+  { "name": "falabella", "re": "(falabella\\s*argentina|falabella\\s*ba)", "category": "Tiendas departamentales", "strength": 0.9 },
+  { "name": "ripley", "re": "(ripley\\s*argentina|ripley\\s*ba)", "category": "Tiendas departamentales", "strength": 0.9 },
+  { "name": "sodimac", "re": "(sodimac\\s*argentina|sodimac\\s*ba)", "category": "Ferretería y hogar", "strength": 0.9 },
+  { "name": "easy", "re": "(easy\\s*argentina|easy\\s*home)", "category": "Ferretería y hogar", "strength": 0.9 },
+  
+  { "name": "libreria", "re": "(libreria\\s*antartica|antartica\\s*libros|libreria\\s*galerna)", "category": "Educación", "strength": 0.85 },
+  { "name": "musica", "re": "(musica\\s*cd|cd\\s*shop|disqueria)", "category": "Entretenimiento", "strength": 0.85 },
+  
+  { "name": "cine", "re": "(cinemark|cines\\s*argentina|Hoyts| multiplex)", "category": "Entretenimiento", "strength": 0.88 },
+  { "name": "teatro", "re": "(teatro\\s*colon|teatro\\s*nacional|teatro\\s*gran\\s*rex)", "category": "Entretenimiento", "strength": 0.85 },
+  
+  { "name": "gas-natural", "re": "(metrogas|gas\\s*natural\\s*ban)", "category": "Servicios", "strength": 0.9 },
+  { "name": "telefonia-fija", "re": "(telefonica\\s*fija|Claro\\s*fija|Telecom\\s*fija)", "category": "Servicios", "strength": 0.9 },
+  { "name": "internet", "re": "(fibertel\\s*internet|claro\\s*internet|personal\\s*internet)", "category": "Servicios", "strength": 0.9 },
+  
+  { "name": "seguro-auto", "re": "(seguro\\s*auto|seguros\\s*la\\s*patagonia|seguros\\s*zurich)", "category": "Seguros", "strength": 0.88 },
+  { "name": "seguro-vida", "re": "(seguro\\s*vida|seguros\\s*prudential|seguros\\s*metlife)", "category": "Seguros", "strength": 0.88 },
+  
+  { "name": "farmacias", "re": "(farmacia\\s*central|farmacia\\s*nacional|farmacia\\s*sao)", "category": "Salud", "strength": 0.85 },
+  { "name": "clinicas", "re": "(clinica\\s*argentina|clinica\\s*suizo|clinica\\s*del\\s*pilar)", "category": "Salud", "strength": 0.88 },
+  
+  { "name": "museo", "re": "(museo\\s*malba|museo\\s*nacional\\s*bellas|museo\\s*temporal)", "category": "Cultura", "strength": 0.82 },
+  { "name": "deportes", "re": "(nik\\s*argentina|adidas\\s*argentina|under\\s*armour)", "category": "Deportes", "strength": 0.85 },
+  
+  { "name": "autoservicio", "re": "(autoservicio\\s*express|autoservicio\\s*24h|conbini)", "category": "Tiendas de conveniencia", "strength": 0.85 },
+  
+  { "name": "ropa", "re": "(zara\\s*argentina|h&m\\s*argentina|uniqlo\\s*argentina|bershka)", "category": "Moda y ropa", "strength": 0.88 },
+  { "name": "calzado", "re": "(adidas\\s*shoes|nike\\s*shoes|puma\\s*shoes|converse)", "category": "Calzado", "strength": 0.85 },
+  
+  { "name": "tecnologia", "re": "(garbarino\\s*argentina|musimundo\\s*tech|falabella\\s*tech)", "category": "Tecnología", "strength": 0.88 },
+  { "name": "electrodomesticos", "re": "(garbarino|musimundo|easym\\s*argentina|electrolux)", "category": "Electrodomésticos", "strength": 0.88 },
+  
+  { "name": "catering", "re": "(catering\\s*argentina|eventos\\s*catering|delivery\\s*catering)", "category": "Servicios de eventos", "strength": 0.85 },
+  { "name": "lavadero", "re": "(lavadero\\s*express|auto\\s*lavado|lavadero\\s*24h)", "category": "Servicios automotrices", "strength": 0.85 },
+  { "name": "gimnasio", "re": "(gimnasio\\s*smart|gimnasio\\s*fitness|clases\\s*gym)", "category": "Salud y fitness", "strength": 0.85 },
+  { "name": "gimnasio-generic", "re": "(\\bgimnasio\\b|gimnasio\\s*fit|gimnasio\\s*fitnes|gimnasio\\s*club)", "category": "Salud y fitness", "strength": 0.9 },
+  { "name": "belleza", "re": "(peluqueria\\s*express|estetica\\s*facial|manicura)", "category": "Belleza", "strength": 0.85 },
+  { "name": "veterinaria", "re": "(veterinaria\\s*24h|clinica\\s*veterinaria|petshop)", "category": "Mascotas", "strength": 0.85 },
+  { "name": "floreria", "re": "(floreria\\s*express|flores\\s*delivery|floreria\\s*24h)", "category": "Flores", "strength": 0.82 },
+  { "name": "delivery", "re": "(delivery\\s*express|pedidos\\s*express|envio\\s*24h)", "category": "Servicios de entrega", "strength": 0.8 }
+  ,
+  { "name": "rent-alquiler", "re": "(alquiler|alquileres|pago\\s+de\\s+alquiler|inquilino|inmobiliaria)", "category": "Vivienda", "strength": 0.95 },
+  { "name": "salary-pay", "re": "(sueldo|salario|pago\\s+de\\s+sueldo|pago\\s+salario|nomina|n[oó]mina)", "category": "Salarios", "strength": 0.98 },
+  { "name": "transferencia", "re": "(transferencia|transferido|transferida|transferencia\\s+recibida)", "category": "Transferencias", "strength": 0.9 }
 ]

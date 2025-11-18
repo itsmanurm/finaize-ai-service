@@ -1,3 +1,5 @@
+import dotenv from 'dotenv';
+dotenv.config();
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
@@ -9,7 +11,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { logger } from './lib/logger';
 import { apiKeyAuth } from './middleware/auth';
 import aiRoutes from './routes/ai';
+import chatRoutes from './routes/chat';
 import metaRoutes from './routes/meta';
+import metaEnhancedRoutes from './routes/meta-enhanced';
 
 const PORT = Number(process.env.PORT ?? 8081);
 const ORIGIN = process.env.CORS_ORIGIN ?? '*';
@@ -50,7 +54,10 @@ app.use(apiKeyAuth);
 
 // Rutas protegidas
 app.use('/ai', aiRoutes);
+app.use('/ai', chatRoutes);
 app.use('/ai', metaRoutes);
+// Rutas de métricas avanzadas (también protegidas)
+app.use('/ai', metaEnhancedRoutes);
 
 // Propagar X-Request-Id
 app.use((req, res, next) => {

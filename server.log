@@ -1,0 +1,1294 @@
+
+> ai-service@1.0.0 start
+> node dist/index.js
+
+[dotenv@17.2.3] injecting env (9) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+[2025-11-17 23:07:33.770 -0300] [32mINFO[39m: [36m[ai-service] listening on :3000[39m
+    [35mservice[39m: "ai-service"
+[0mPOST /ai/chat [32m200[0m 6.088 ms - 433[0m
+[2025-11-17 23:07:51.745 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "c1d3f894-9e70-4727-a977-69999095319d",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "63"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 49551
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=119, reset=60",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "433",
+        "etag": "W/\"1b1-sS0WFsJusYWoYb014Pw6RTim+J0\""
+      }
+    }
+    [35mresponseTime[39m: 12
+[0mPOST /ai/chat [32m200[0m 1.088 ms - 218[0m
+[2025-11-17 23:18:02.937 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "88e146ba-7bb6-4f06-8577-edc5105b4dd4",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "84"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 50269
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=119, reset=60",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "218",
+        "etag": "W/\"da-E5hZPhT6gbJIifewPjeqLlM6PF0\""
+      }
+    }
+    [35mresponseTime[39m: 2
+[0mPOST /ai/chat [32m200[0m 1875.719 ms - 181[0m
+[2025-11-17 23:20:34.585 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "27a735ca-02a9-4053-8e1d-9d3ae9727974",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "56"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 50443
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=119, reset=60",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "181",
+        "etag": "W/\"b5-CdN8JW84W21yQOzaZ4GumiOio1A\""
+      }
+    }
+    [35mresponseTime[39m: 1879
+[0mPOST /ai/chat [32m200[0m 0.544 ms - 220[0m
+[2025-11-17 23:20:40.397 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "d63a5a22-bd03-4882-a61d-d0cc38a5d4f7",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "57"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 50458
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=118, reset=53",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-pirD9A7U3yhVR00IUU7JkCgZ+8A\""
+      }
+    }
+    [35mresponseTime[39m: 2
+[0mPOST /ai/chat [32m200[0m 0.313 ms - 218[0m
+[2025-11-17 23:20:45.057 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "896e0392-dcc0-4f44-a817-f20ec08fbac6",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "56"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 50467
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=117, reset=48",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "218",
+        "etag": "W/\"da-FcDwX2OD1irpS/GJWIpGVDAqLH8\""
+      }
+    }
+    [35mresponseTime[39m: 1
+[0mPOST /ai/chat [32m200[0m 0.320 ms - 181[0m
+[2025-11-17 23:20:47.868 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "dc11592f-85ad-4f37-8192-15f32aef7453",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "49"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 50472
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=116, reset=45",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "181",
+        "etag": "W/\"b5-0gSTNq//O6MaGDE6rTrDimUpKv0\""
+      }
+    }
+    [35mresponseTime[39m: 1
+[0mPOST /ai/chat [32m200[0m 1453.546 ms - 181[0m
+[2025-11-17 23:20:50.791 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "1b96be5a-fe63-4b35-8b55-4a34acca48ed",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "54"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 50475
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=115, reset=44",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "181",
+        "etag": "W/\"b5-ccB1DrDeduvl9aU/5uf846gqfEU\""
+      }
+    }
+    [35mresponseTime[39m: 1454
+[0mPOST /ai/chat [32m200[0m 1089.465 ms - 185[0m
+[2025-11-17 23:21:27.997 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "80dd098d-4bcd-4ebd-bc0e-d2ecb4d2181a",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "46"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 50529
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=114, reset=6",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "185",
+        "etag": "W/\"b9-kXRVOTZbnHjGwSp4QC6b/rvK2/8\""
+      }
+    }
+    [35mresponseTime[39m: 1091
+[0mPOST /ai/chat [32m200[0m 0.627 ms - 220[0m
+[2025-11-17 23:22:25.289 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "992dd6be-4785-48ce-bc31-eaf10d03e34a",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "57"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 50606
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=119, reset=60",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-MlC26h798PeIo5r9xIrmyeLqjbI\""
+      }
+    }
+    [35mresponseTime[39m: 2
+[0mPOST /ai/chat [32m200[0m 0.581 ms - 220[0m
+[2025-11-17 23:26:40.242 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "9a6f2425-3f15-4507-ba45-9b87381fc291",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "57"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 50922
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=119, reset=60",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-ZKO8TCWodplBvUkhtT78FYYAbK4\""
+      }
+    }
+    [35mresponseTime[39m: 1
+[0mPOST /ai/chat [32m200[0m 0.325 ms - 220[0m
+[2025-11-17 23:26:43.629 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "f0455ef9-0543-40c5-b4d7-c71c4c118301",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "61"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 50931
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=118, reset=57",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-PBw/dC1snjBwj0OgRTqTMIReR8Q\""
+      }
+    }
+    [35mresponseTime[39m: 1
+[0mPOST /ai/chat [32m200[0m 0.408 ms - 220[0m
+[2025-11-17 23:26:45.796 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "f77a0b15-a94d-440d-8b6d-a73b9ed1201c",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "53"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 50936
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=117, reset=55",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-pdVzCLrli1PxnVfkLoYTtU/D+68\""
+      }
+    }
+    [35mresponseTime[39m: 1
+[0mPOST /ai/chat [32m200[0m 0.402 ms - 220[0m
+[2025-11-17 23:26:47.484 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "031775c0-2c65-48fe-b589-b20eb9c1c5e5",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "59"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 50939
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=116, reset=53",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-0wNimkZ9IWjenmMi9wnIUARWwMQ\""
+      }
+    }
+    [35mresponseTime[39m: 1
+[0mPOST /ai/chat [32m200[0m 0.251 ms - 220[0m
+[2025-11-17 23:26:49.594 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "470cd721-a7a3-4462-b9e1-b94c63d1551e",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "42"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 50944
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=115, reset=51",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-cIGRpncuksmeOxXGnUqDMs7mc7w\""
+      }
+    }
+    [35mresponseTime[39m: 0
+[0mPOST /ai/chat [32m200[0m 0.233 ms - 220[0m
+[2025-11-17 23:28:29.235 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "6237e5f3-7eb7-40c5-8d8d-cffe019efeb2",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "42"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 51091
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=119, reset=60",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-OEFQxwhrYatxBCWC9tADtZ7jsPw\""
+      }
+    }
+    [35mresponseTime[39m: 1
+[0mPOST /ai/chat [32m200[0m 0.396 ms - 220[0m
+[2025-11-17 23:28:44.277 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "93da15eb-11b0-4591-b175-68176b56a0f9",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "42"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 51119
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=118, reset=45",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-PvFPpoEVH60KEa7vHiQQCM706wg\""
+      }
+    }
+    [35mresponseTime[39m: 0
+[0mPOST /ai/chat [32m200[0m 0.261 ms - 220[0m
+[2025-11-17 23:29:32.728 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "7a680d0b-eb15-490f-9014-956dcbc20ef3",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "42"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 51188
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=119, reset=60",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-8YjmL+6vhuw/SNGdLubPGGLdQmI\""
+      }
+    }
+    [35mresponseTime[39m: 1
+[0mPOST /ai/chat [32m200[0m 0.244 ms - 220[0m
+[2025-11-17 23:29:46.466 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "58d5b42f-df85-45c4-8441-cc050b838ad3",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "42"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 51212
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=118, reset=47",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-5leyuuu7pmm3nCr6cA6fjanyBT8\""
+      }
+    }
+    [35mresponseTime[39m: 1
+[0mPOST /ai/chat [32m200[0m 0.354 ms - 220[0m
+[2025-11-17 23:29:57.657 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "e66bf440-2854-4fb9-921f-1bd12f945621",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "42"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 51233
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=117, reset=36",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-iTgAsYA7zJ1KPfMhUInsovbDayE\""
+      }
+    }
+    [35mresponseTime[39m: 1
+[0mPOST /ai/chat [32m200[0m 0.296 ms - 220[0m
+[2025-11-17 23:30:25.460 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "055b3772-5149-4afb-9620-d62ab43f30b2",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "42"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 51278
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=116, reset=8",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-7bnNoZaBtljiJnqw+NIPutuddYs\""
+      }
+    }
+    [35mresponseTime[39m: 0
+[0mPOST /ai/chat [32m200[0m 0.299 ms - 220[0m
+[2025-11-17 23:31:34.315 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "db31356e-8423-4b15-ab9a-9c7ff510d1b1",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "42"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 51383
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=119, reset=60",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-6bvCldRCxzVovUnTWU9nUB4MaJQ\""
+      }
+    }
+    [35mresponseTime[39m: 1
+[0mPOST /ai/chat [32m200[0m 0.632 ms - 220[0m
+[2025-11-17 23:32:14.708 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "8a3c4d5b-c716-40a8-8971-acc9a33c49ca",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "42"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 51439
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=118, reset=20",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-ynLvu++Z2U+Gnz+zq7ChuDM8h3w\""
+      }
+    }
+    [35mresponseTime[39m: 2
+[0mPOST /ai/chat [32m200[0m 0.343 ms - 220[0m
+[2025-11-17 23:32:47.361 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "861ece4d-46ac-45cf-b640-658b93c045c0",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "42"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 51487
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=119, reset=60",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-cEK5bdb65//UQ+OwQXkxY7CZ3H8\""
+      }
+    }
+    [35mresponseTime[39m: 1
+[0mPOST /ai/chat [32m200[0m 0.512 ms - 220[0m
+[2025-11-17 23:34:58.212 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "f32192af-5b3c-4248-9c38-de504c40fcee",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "42"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 51662
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=119, reset=60",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-iKBEZEBPHJQY0YokiH2drQ3Qq2Y\""
+      }
+    }
+    [35mresponseTime[39m: 1
+[0mPOST /ai/chat [32m200[0m 0.223 ms - 220[0m
+[2025-11-17 23:35:44.943 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "e12091f5-482d-44d8-96ef-224b7ce30052",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "42"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 51733
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=118, reset=14",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-oUQnyXz0ItQkXMer5Y/PyDnWpLk\""
+      }
+    }
+    [35mresponseTime[39m: 1
+[0mPOST /ai/chat [32m200[0m 0.243 ms - 220[0m
+[2025-11-17 23:36:26.550 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "a21571d9-1d58-4e42-afc6-3cfafe2cc083",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "42"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 51794
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=119, reset=60",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-3sFM1Dl7J7e5e3JjjpOUGiyURyg\""
+      }
+    }
+    [35mresponseTime[39m: 0
+[0mPOST /ai/chat [32m200[0m 0.224 ms - 220[0m
+[2025-11-17 23:39:11.242 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "1f0c621d-11dc-48c5-9425-7dbbe5c1c5d9",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "42"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 52004
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=119, reset=60",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-rRBEblIx3M8J6sTQ73UwP9Rudv4\""
+      }
+    }
+    [35mresponseTime[39m: 0
+[0mPOST /ai/chat [32m200[0m 0.265 ms - 220[0m
+[2025-11-17 23:40:11.160 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "695aadac-8ee9-4d95-be26-1dc72885a0dc",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "42"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 52093
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=118, reset=1",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-9qMYDGAwzjeJ2gPP62F/hNrOrYw\""
+      }
+    }
+    [35mresponseTime[39m: 1
+[0mPOST /ai/chat [32m200[0m 0.256 ms - 220[0m
+[2025-11-17 23:40:24.110 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "1bca4faa-c251-4b0a-ac32-830d51a900ca",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "42"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 52112
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=119, reset=60",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-Bzets3OdQSlcD3HSwU3x2dUAXR4\""
+      }
+    }
+    [35mresponseTime[39m: 0
+[0mPOST /ai/chat [32m200[0m 0.290 ms - 220[0m
+[2025-11-17 23:40:50.386 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "d8e04829-591d-43bc-b598-fb2d4554672a",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "42"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 52157
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=118, reset=34",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-4piM97/9TsNJutAgUAA4yf5bBwk\""
+      }
+    }
+    [35mresponseTime[39m: 0
+[0mPOST /ai/chat [32m200[0m 0.185 ms - 220[0m
+[2025-11-17 23:41:35.475 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "916feded-2d61-4c75-883c-af0eba4b657a",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "42"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 52226
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=119, reset=60",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-JijmyhheK8s3HzPvHGjGtvbYL88\""
+      }
+    }
+    [35mresponseTime[39m: 1
+[0mPOST /ai/chat [32m200[0m 0.247 ms - 220[0m
+[2025-11-17 23:43:02.407 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "be3b7852-bbf3-422b-b7b7-31f38008ab50",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "59"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 52346
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=119, reset=60",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-303ViGeg66NCNWjyFlEubUCnXmE\""
+      }
+    }
+    [35mresponseTime[39m: 0
+[0mPOST /ai/chat [32m200[0m 0.205 ms - 220[0m
+[2025-11-17 23:43:21.105 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "543a7879-9090-4223-86c2-0d9c99255d26",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "59"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 52380
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=118, reset=42",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-9aDrtyBtuwb/07DNVXCIxnmt3ag\""
+      }
+    }
+    [35mresponseTime[39m: 0
+[0mPOST /ai/chat [32m200[0m 0.511 ms - 220[0m
+[2025-11-17 23:44:46.055 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "b6c36018-c61a-4157-b9ad-c283e829bac3",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "57"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 52493
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=119, reset=60",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-PD8YeTrJkrr6WmG2sZoK2NYB9kw\""
+      }
+    }
+    [35mresponseTime[39m: 1
+[0mPOST /ai/chat [32m200[0m 0.255 ms - 220[0m
+[2025-11-17 23:47:02.750 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "cc96ca47-1200-4559-997e-b767fc8966fc",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "57"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 52682
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=119, reset=60",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-cUD613AOdIMykGG/jWJ8ViFmAvM\""
+      }
+    }
+    [35mresponseTime[39m: 1
+[0mPOST /ai/chat [32m200[0m 0.274 ms - 220[0m
+[2025-11-17 23:47:51.347 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "f8da076f-bf45-4a60-bda4-7ed3df3c4697",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "57"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 52752
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=118, reset=12",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "220",
+        "etag": "W/\"dc-CMcL/oGdNcT4ctHH+ZI4WZNA1tg\""
+      }
+    }
+    [35mresponseTime[39m: 0
+[0mPOST /ai/chat [32m200[0m 1551.527 ms - 181[0m
+[2025-11-17 23:51:25.789 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "ed0687e2-a22b-4b3e-8008-9e9d49e63069",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "51"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 53023
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=119, reset=60",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "181",
+        "etag": "W/\"b5-Rh2S4lddTYII7fIwmlJV6BtSe1Q\""
+      }
+    }
+    [35mresponseTime[39m: 1555
+[0mPOST /ai/chat [32m200[0m 1044.754 ms - 186[0m
+[2025-11-17 23:52:57.903 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "d4ee86ab-82cf-486a-85f8-3aaedaf2be7c",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "51"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 53141
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=119, reset=60",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "186",
+        "etag": "W/\"ba-ErB0MHsBOXCfCQZwZD1C3eFTkwk\""
+      }
+    }
+    [35mresponseTime[39m: 1046
+[0mPOST /ai/chat [32m200[0m 738.707 ms - 181[0m
+[2025-11-17 23:53:47.586 -0300] [32mINFO[39m: [36mrequest completed[39m
+    [35mservice[39m: "ai-service"
+    [35mreq[39m: {
+      "id": "571fdc2b-6737-4565-b494-af2bc81318da",
+      "method": "POST",
+      "url": "/ai/chat",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/8.7.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-api-key": "supersecreta1",
+        "content-length": "51"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 53216
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "ratelimit-policy": "120;w=60",
+        "ratelimit": "limit=120, remaining=118, reset=11",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "181",
+        "etag": "W/\"b5-OtyWtnmXLpeVZFYlQXiErc/WcGo\""
+      }
+    }
+    [35mresponseTime[39m: 739

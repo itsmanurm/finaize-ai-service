@@ -97,10 +97,17 @@ r.post('/summarize', async (req, res) => {
   // 3) Sugerencias simples
   const totalAbs = Math.abs(totalExpense) + Math.abs(totalIncome);
   const tips: string[] = [];
-  const catTop = catArr[0];
-  if (catTop && catTop.category.toLowerCase().includes('transporte') && Math.abs(catTop.total) > 0.3 * Math.abs(totalExpense)) {
-    tips.push('Tu gasto en Transporte es alto este período ( >30% de los egresos ). Considerá optimizar traslados.');
-  }
+// Buscar todas las categorías que tengan "transporte"
+const transporteCats = catArr.filter(c =>
+  c.category.toLowerCase().includes('transporte')
+);
+// Sumar el total de transporte
+const transporteTotal = transporteCats.reduce((acc, c) => acc + c.total, 0);
+// Si el transporte supera el 30% de los egresos, sugerencia
+if (Math.abs(transporteTotal) > 0.3 * Math.abs(totalExpense)) {
+  tips.push('Tu gasto en Transporte es alto este período ( >30% de los egresos ). Considerá optimizar traslados.');
+}
+
   const subCandidates = merchArr.filter(m => /netflix|spotify|disney|youtube/i.test(m.merchant ?? ''));
   if (subCandidates.length >= 2) tips.push('Detectamos múltiples suscripciones. Revisá si las usás todas.');
   if (net < 0) tips.push('Cerraste el período con balance negativo. Evaluá reducir rubros con mayor peso.');
@@ -118,6 +125,30 @@ r.post('/summarize', async (req, res) => {
     topMerchants: merchArr.map(x => ({ ...x, total: Number(x.total.toFixed(2)) })),
     suggestions: tips
   });
+});
+
+/** POST /api/ai -> Redirige a /ai/categorize */
+// Nota: el router se monta en `/ai`, por lo que aquí la ruta raíz `/` redirige a `/categorize`.
+r.post('/', (req, res) => {
+  res.redirect(307, '/ai/categorize');
+});
+
+// Ruta para pruebas adicionales
+r.post('/test-cases', async (req, res) => {
+  const testCases = req.body;
+  if (!Array.isArray(testCases)) {
+    return res.status(400).json({ ok: false, error: 'Se espera un array de casos de prueba.' });
+  }
+
+  const results = await Promise.all(testCases.map(async (testCase) => {
+    try {
+      return await categorize(testCase);
+    } catch (error) {
+      return { error: (error as Error).message, input: testCase };
+    }
+  }));
+
+  res.json({ ok: true, results });
 });
 
 export default r;

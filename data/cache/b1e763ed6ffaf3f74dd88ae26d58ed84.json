@@ -1,0 +1,13 @@
+{
+  "data": {
+    "category": "Otros gastos",
+    "confidence": 0.4,
+    "reasons": [
+      "fallback:heuristic"
+    ],
+    "merchant_clean": "",
+    "dedupHash": "2c41127b23003cff4c1506a85aab152421ed622d",
+    "aiEnhanced": false
+  },
+  "timestamp": 1763432154859
+}
