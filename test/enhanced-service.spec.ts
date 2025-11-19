@@ -13,8 +13,14 @@ describe('enhanced-service', () => {
       amount: 1000,
       currency: 'ARS'
     } as any;
+    // Simular ausencia de AI para este test
+    const _orig = process.env.OPENAI_API_KEY;
+    delete process.env.OPENAI_API_KEY;
 
     const res = await categorize(input);
+
+    // Restaurar clave
+    process.env.OPENAI_API_KEY = _orig;
     expect(res).toBeTruthy();
     expect(res.category).toBe('Ingresos');
   });
@@ -25,8 +31,14 @@ describe('enhanced-service', () => {
       amount: -250,
       currency: 'ARS'
     } as any;
+    // Simular ausencia de AI para este test
+    const _orig = process.env.OPENAI_API_KEY;
+    delete process.env.OPENAI_API_KEY;
 
     const res = await categorize(input);
+
+    // Restaurar clave
+    process.env.OPENAI_API_KEY = _orig;
     expect(res).toBeTruthy();
     expect(res.category).toBe('Sin clasificar');
   });

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "test": "vitest",
+    "test:offline": "USE_OPENAI_MOCK=true vitest",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js"
   },

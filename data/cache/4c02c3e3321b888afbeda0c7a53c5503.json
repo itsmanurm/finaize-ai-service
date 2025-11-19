@@ -1,0 +1,14 @@
+{
+  "data": {
+    "category": "Ingresos",
+    "confidence": 0.95,
+    "reasons": [
+      "ai:Dado que el monto de la transacción es ARS 3.000,00 y se trata de un ingreso, lo más probable es que corresponda a una entrada de dinero en la cuenta del usuario. Por lo tanto, la categoría seleccionada es 'Ingresos'."
+    ],
+    "merchant_clean": "",
+    "dedupHash": "2c06c089b4af0114a8bae2879df3f5079e667a65",
+    "aiEnhanced": true,
+    "aiReasoning": "Dado que el monto de la transacción es ARS 3.000,00 y se trata de un ingreso, lo más probable es que corresponda a una entrada de dinero en la cuenta del usuario. Por lo tanto, la categoría seleccionada es 'Ingresos'."
+  },
+  "timestamp": 1763504790995
+}

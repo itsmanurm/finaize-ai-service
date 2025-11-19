@@ -39,3 +39,14 @@
 {"date":"2025-11-25","amount":1200,"currency":"ARS","merchant":"Freddo","category":"cafetería","description":"Helado Freddo"}
 {"date":"2025-11-28","amount":1800,"currency":"ARS","merchant":"Havanna","category":"cafetería","description":"Café Havanna"}
 {"date":"2025-11-30","amount":2200,"currency":"ARS","merchant":"Claro","category":"servicios","description":"Factura celular Claro"}
+{"ts":"2025-11-18T22:26:30.997Z","amount":3000,"currency":"ARS","merchant":"","description":"","category":"Ingresos","confidence":0.95,"dedupHash":"2c06c089b4af0114a8bae2879df3f5079e667a65"}
+{"ts":"2025-11-18T22:26:30.998Z","amount":1500,"currency":"ARS","merchant":"","description":"tomé un uber","category":"Transporte","confidence":0.95,"dedupHash":"2ada61671eb3b3deea065f75494f2a65e2b66737"}
+{"ts":"2025-11-18T22:26:33.472Z","amount":2500,"currency":"ARS","merchant":"","description":"fotocopias","category":"Educación","confidence":0.85,"dedupHash":"a588257d961470d08c845a9c7a9be9ad33a668e1"}
+{"ts":"2025-11-18T22:31:57.612Z","amount":3000,"currency":"ARS","merchant":"","description":"manzanas","category":"Alimentación","confidence":0.9,"dedupHash":"2c06c089b4af0114a8bae2879df3f5079e667a65"}
+{"ts":"2025-11-18T22:31:57.614Z","amount":1500,"currency":"ARS","merchant":"","description":"uber","category":"Transporte","confidence":0.95,"dedupHash":"2ada61671eb3b3deea065f75494f2a65e2b66737"}
+{"ts":"2025-11-18T22:31:57.614Z","amount":2500,"currency":"ARS","merchant":"","description":"fotocopias","category":"Educación","confidence":0.85,"dedupHash":"a588257d961470d08c845a9c7a9be9ad33a668e1"}
+{"ts":"2025-11-18T22:32:13.892Z","amount":3000,"currency":"ARS","merchant":"","description":"manzanas","category":"Alimentación","confidence":0.9,"dedupHash":"2c06c089b4af0114a8bae2879df3f5079e667a65"}
+{"ts":"2025-11-18T22:32:13.893Z","amount":1500,"currency":"ARS","merchant":"","description":"uber","category":"Transporte","confidence":0.95,"dedupHash":"2ada61671eb3b3deea065f75494f2a65e2b66737"}
+{"ts":"2025-11-18T22:32:13.893Z","amount":2500,"currency":"ARS","merchant":"","description":"fotocopias","category":"Educación","confidence":0.85,"dedupHash":"a588257d961470d08c845a9c7a9be9ad33a668e1"}
+{"ts":"2025-11-18T22:34:48.823Z","amount":100000,"currency":"ARS","merchant":"PC","description":"","category":"Ingresos","confidence":0.9,"dedupHash":"b089b0990812b5b8f1356af3cf8fd6d30933870f"}
+{"ts":"2025-11-18T22:36:32.446Z","amount":1000000,"currency":"ARS","merchant":"computadora","description":"","category":"Tecnología","confidence":0.9,"dedupHash":"b7600512f65cf36f212533b65eba918a2a75c398"}

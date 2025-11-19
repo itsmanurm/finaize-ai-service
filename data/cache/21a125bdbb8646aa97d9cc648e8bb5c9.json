@@ -1,0 +1,13 @@
+{
+  "data": {
+    "category": "Transporte",
+    "confidence": 0.95,
+    "reasons": [
+      "rule:ride-hailing"
+    ],
+    "merchant_clean": "",
+    "dedupHash": "2ada61671eb3b3deea065f75494f2a65e2b66737",
+    "aiEnhanced": false
+  },
+  "timestamp": 1763504790998
+}

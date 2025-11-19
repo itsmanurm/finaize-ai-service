@@ -3,6 +3,7 @@ import { rulesCategory } from './rule-engine';
 import { createHash } from 'crypto';
 import { getCachedCategorization, setCachedCategorization } from './cache';
 import { categorizeWithOpenAI } from './openai-service';
+import { config } from '../config';
 
 type Currency = 'ARS' | 'USD';
 
@@ -78,7 +79,7 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
   // Si se requiere IA específicamente o si no hay match de reglas
   const rule = rulesCategory(bag);
   // Validar configuración de AI_MIN_CONFIDENCE
-  const minConf = Number(process.env.AI_MIN_CONFIDENCE ?? 0.6);
+  const minConf = config.AI_MIN_CONFIDENCE;
   if (isNaN(minConf) || minConf <= 0 || minConf > 1) {
     console.warn('AI_MIN_CONFIDENCE no está configurado correctamente. Usando valor por defecto: 0.6');
   }
@@ -90,7 +91,7 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
   if (input.useAI || !rule.hit || (rule as any).strength < minConf) {
     try {
       // Verificar si OpenAI está disponible
-      if (process.env.OPENAI_API_KEY) {
+      if (config.OPENAI_API_KEY) {
         const key = common.dedupHash;
 
         if (inFlightRequests.has(key)) {
@@ -157,7 +158,14 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
   
   if ((rule as any).hit) {
     const conf = Math.min(1, (rule as any).strength);
-    const category = conf >= minConf ? (rule as any).category : 'Sin clasificar';
+    let category: string;
+    if (conf >= minConf) {
+      category = (rule as any).category;
+    } else {
+      // Si la regla tuvo hit pero la confianza es baja, usar fallback basado en monto
+      const isExpense = Number(input.amount) < 0;
+      category = isExpense ? 'Sin clasificar' : 'Ingresos';
+    }
     result = {
       category,
       confidence: conf,
@@ -168,10 +176,18 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
     };
   } else {
     const isExpense = Number(input.amount) < 0;
+    const defaultCat = isExpense ? 'Sin clasificar' : 'Ingresos';
+    console.log('DEBUG: Categorize Input:', JSON.stringify(input, null, 2));
+    console.log('DEBUG: Rule Match:', JSON.stringify(rule, null, 2));
+    console.log('DEBUG: AI Confidence Threshold:', minConf);
+    console.log('DEBUG: Fallback Logic:', {
+      isExpense,
+      defaultCat
+    });
     // Fallback inteligente
-    const defaultCat = isExpense ? 'Otros gastos' : 'Otros ingresos';
+    const fallbackCategory = isExpense ? 'Sin clasificar' : 'Ingresos';
     result = {
-      category: defaultCat,
+      category: fallbackCategory,
       confidence: 0.4,
       reasons: ['fallback:heuristic'],
       merchant_clean,
@@ -182,7 +198,6 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
   
   // Guardar en cache
   await setCachedCategorization(cacheKey, result);
-  
   return result;
 }
 

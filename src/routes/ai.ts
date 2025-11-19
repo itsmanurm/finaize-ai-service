@@ -2,8 +2,26 @@ import { Router } from 'express';
 import { ItemSchema, FeedbackSchema, SummarizeSchema } from '../ai/schema';
 import { categorize } from '../ai/service';
 import { appendJsonl } from '../utils/jsonl';
+import { parseMessage } from '../ai/nlu';
 
 const r = Router();
+
+/** POST /ai/parse - Procesa mensajes en lenguaje natural (NLU) */
+r.post('/parse', async (req, res) => {
+  const { message, userId } = req.body || {};
+  
+  if (!message || typeof message !== 'string') {
+    return res.status(400).json({ ok: false, error: 'message requerido' });
+  }
+
+  try {
+    const result = await parseMessage(message);
+    return res.json({ ok: true, ...result });
+  } catch (error: any) {
+    console.error('[AI Parse] Error:', error);
+    return res.status(500).json({ ok: false, error: 'Error procesando mensaje', details: error.message });
+  }
+});
 
 /** POST /ai/categorize (single) */
 r.post('/categorize', async (req, res) => {
@@ -130,7 +148,7 @@ if (Math.abs(transporteTotal) > 0.3 * Math.abs(totalExpense)) {
 /** POST /api/ai -> Redirige a /ai/categorize */
 // Nota: el router se monta en `/ai`, por lo que aquí la ruta raíz `/` redirige a `/categorize`.
 r.post('/', (req, res) => {
-  res.redirect(307, '/ai/categorize');
+  res.redirect(307, '/categorize');
 });
 
 // Ruta para pruebas adicionales

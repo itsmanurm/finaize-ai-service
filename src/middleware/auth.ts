@@ -10,6 +10,8 @@ export function apiKeyAuth(req: Request, res: Response, next: NextFunction) {
   if (req.path === '/health') return next();
 
   const key = (req.header('x-api-key') || '').trim();
+  console.log('x-api-key received:', key); // Log para depuración
+  console.log('Valid API keys:', keys); // Log para depuración
   if (!key || !keys.includes(key)) {
     return res.status(401).json({ ok: false, error: 'Unauthorized' });
   }

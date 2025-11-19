@@ -7,11 +7,7 @@ const r = Router();
 
 /** POST /ai/chat */
 r.post('/chat', async (req, res) => {
-  const apiKey = req.header('x-api-key') || '';
-  if (!apiKey || apiKey !== process.env.API_KEY) {
-    console.warn(`[auth] Invalid or missing API key: ${apiKey}`);
-    return res.status(401).json({ ok: false, error: 'API key inválida o ausente' });
-  }
+  // Auth handled globally by `apiKeyAuth` middleware mounted in `src/index.ts`.
 
   const { sessionId, message, options } = req.body || {};
   if (!message || typeof message !== 'string' || message.length < 2) {
@@ -55,7 +51,22 @@ r.post('/chat', async (req, res) => {
       actionFn = require('../ai/actions').queryMarketInfo;
     }
 
-    if (nlu.intent && actionFn) {
+    if (nlu.intent === 'add_expense_list') {
+      // Crear múltiples gastos a partir de items extraídos por NLU
+      const items = (nlu.entities as any)?.items || [];
+      const created: any[] = [];
+      for (const it of items) {
+        try {
+          const r = await actionAddExpense(it, true);
+          if (r && r.record) created.push(r.record);
+        } catch (e: any) {
+          console.warn('[chat] Error creando gasto item:', it, e?.message || e);
+        }
+      }
+      actionResult = { ok: true, created };
+      if (created.length) reply = `Registrados ${created.length} gastos.`;
+      else reply = 'No se pudieron registrar los gastos.';
+    } else if (nlu.intent && actionFn) {
       // Pasar entidades extraídas como opciones de filtrado
       const opts = { ...options, ...nlu.entities, intent: nlu.intent };
       actionResult = await actionFn(opts);
@@ -66,7 +77,7 @@ r.post('/chat', async (req, res) => {
         reply = `Resumen: ingreso ${actionResult.totals.income}, gasto ${actionResult.totals.expense}, neto ${actionResult.totals.net}`;
       } else if (nlu.intent === 'query_top_expenses') {
         if (actionResult.topExpenses && actionResult.topExpenses.length) {
-          reply = 'Tus gastos más altos este mes fueron: ' + actionResult.topExpenses.map(e => `${e.description} (${e.amount} ${e.currency})`).join(', ');
+              reply = 'Tus gastos más altos este mes fueron: ' + actionResult.topExpenses.map((e: any) => `${e.description} (${e.amount} ${e.currency})`).join(', ');
         } else {
           reply = 'No se encontraron gastos altos este mes.';
         }
@@ -76,7 +87,7 @@ r.post('/chat', async (req, res) => {
         reply = 'Puedes enviarme la transacción y la categorizo.';
       } else if (actionFn === require('../ai/actions').queryMarketInfo) {
         if (actionResult.ok && actionResult.activos?.length) {
-          reply = `Los mejores ${actionResult.activos[0].nombre.includes('Apple') ? 'CEDEARs' : 'activos'} ${actionResult.periodo} son: ` + actionResult.activos.map(a => `${a.nombre} (${a.variacion}, $${a.precio})`).join(', ');
+              reply = `Los mejores ${actionResult.activos[0].nombre.includes('Apple') ? 'CEDEARs' : 'activos'} ${actionResult.periodo} son: ` + actionResult.activos.map((a: any) => `${a.nombre} (${a.variacion}, $${a.precio})`).join(', ');
         } else {
           reply = 'No se encontraron activos destacados para tu consulta.';
         }

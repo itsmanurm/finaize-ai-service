@@ -37,38 +37,53 @@
     }
     return { ok: false, activos: [], periodo: payload.period, tipo: payload.tipo };
   }
-  // Acción especial: gastos más altos del mes
-  if (payload.intent === 'query_top_expenses') {
-    // Leer historial y filtrar por mes/año
+  // Helper de normalización reutilizable
+  function normalize(str: string = '') {
+    return String(str)
+      .toLowerCase()
+      .replace(/[áàäâ]/g, 'a')
+      .replace(/[éèëê]/g, 'e')
+      .replace(/[íìïî]/g, 'i')
+      .replace(/[óòöô]/g, 'o')
+      .replace(/[úùüû]/g, 'u')
+      .replace(/\s+/g, '');
+  }
+
+  // Acción: obtener los mayores gastos (extraída a función para evitar side-effects en top-level)
+  export async function queryTopExpenses(payload: { year?: number; month?: number } = {}) {
     const fs = require('fs');
     const path = require('path');
     const filePath = path.join(process.cwd(), 'data', 'transactions.jsonl');
     let lines: any[] = [];
     try {
       const raw = fs.readFileSync(filePath, 'utf8');
-      lines = raw.split('\n').filter(Boolean).map(l => {
+      lines = raw.split('\n').filter(Boolean).map((l: string) => {
         try { return JSON.parse(l); } catch { return null; }
       }).filter(Boolean);
     } catch {}
+
     // Filtrar por mes/año
-    let filtered = lines;
-    if (payload.year) {
-      filtered = filtered.filter(it => {
+    let filtered = lines as any[];
+    if (payload?.year) {
+      const yearStr = payload.year.toString();
+      filtered = filtered.filter((it: any) => {
         const d = it.date || it.ts;
-        return d && d.startsWith(payload.year.toString());
+        return d && d.startsWith(yearStr);
       });
     }
-    if (payload.month) {
-      filtered = filtered.filter(it => {
+    if (payload?.month) {
+      const monthNum = payload.month;
+      filtered = filtered.filter((it: any) => {
         const d = it.date || it.ts;
         const m = d ? Number(d.split('-')[1]) : null;
-        return m === payload.month;
+        return m === monthNum;
       });
     }
+
     // Solo gastos (monto positivo)
-    filtered = filtered.filter(it => Number(it.amount) > 0);
+    filtered = filtered.filter((it: any) => Number(it.amount) > 0);
     // Ordenar por monto descendente y tomar top 3
-    const top = filtered.sort((a, b) => b.amount - a.amount).slice(0, 3);
+    const top = filtered.sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0)).slice(0, 3);
     return {
       ok: true,
       topExpenses: top,
@@ -105,7 +120,7 @@ export async function actionAddExpense(payload: { amount: number; currency?: str
   return { ok: true, record };
 }
 
-export async function actionQuerySummary(payload: { items?: any[]; classifyMissing?: boolean; currency?: string; periodLabel?: string }) {
+export async function actionQuerySummary(payload: { items?: any[]; classifyMissing?: boolean; currency?: string; periodLabel?: string; category?: string; merchant?: string; year?: number; month?: number }) {
   // Leer historial de transacciones
   const fs = require('fs');
   const path = require('path');
@@ -113,31 +128,22 @@ export async function actionQuerySummary(payload: { items?: any[]; classifyMissi
   let lines: any[] = [];
   try {
     const raw = fs.readFileSync(filePath, 'utf8');
-    lines = raw.split('\n').filter(Boolean).map(l => {
+    lines = raw.split('\n').filter(Boolean).map((l: string) => {
       try { return JSON.parse(l); } catch { return null; }
     }).filter(Boolean);
   } catch {}
 
   // Filtrar por entidades
-  let filtered = lines;
+  let filtered: any[] = lines;
   if (payload.category) {
     const catNorm = (payload.category || '').toLowerCase().replace(/\s+/g, '');
-    filtered = filtered.filter(it => (it.category || '').toLowerCase().replace(/\s+/g, '').includes(catNorm));
+    filtered = filtered.filter((it: any) => (it.category || '').toLowerCase().replace(/\s+/g, '').includes(catNorm));
   }
   if (payload.merchant) {
     console.log('[Filtro merchant] valor recibido:', payload.merchant);
-    // Función para normalizar (sin tildes, espacios, minúsculas)
-    const normalize = (str: string) => str
-      .toLowerCase()
-      .replace(/[áàäâ]/g, 'a')
-      .replace(/[éèëê]/g, 'e')
-      .replace(/[íìïî]/g, 'i')
-      .replace(/[óòöô]/g, 'o')
-      .replace(/[úùüû]/g, 'u')
-      .replace(/\s+/g, '');
     const merchNorm = normalize(payload.merchant || '');
     console.error('[Filtro merchant] buscando:', merchNorm);
-    filtered = filtered.filter(it => {
+    filtered = filtered.filter((it: any) => {
       const normHist = normalize(it.merchant || '');
       const match = normHist.includes(merchNorm);
       if (match) console.error('[Filtro merchant] match:', normHist, '<->', merchNorm);
@@ -145,16 +151,18 @@ export async function actionQuerySummary(payload: { items?: any[]; classifyMissi
     });
   }
   if (payload.year) {
-    filtered = filtered.filter(it => {
+    const yearStr = payload.year.toString();
+    filtered = filtered.filter((it: any) => {
       const d = it.date || it.ts;
-      return d && d.startsWith(payload.year.toString());
+      return d && d.startsWith(yearStr);
     });
   }
   if (payload.month) {
-    filtered = filtered.filter(it => {
+    const monthNum = payload.month;
+    filtered = filtered.filter((it: any) => {
       const d = it.date || it.ts;
       const m = d ? Number(d.split('-')[1]) : null;
-      return m === payload.month;
+      return m === monthNum;
     });
   }
 

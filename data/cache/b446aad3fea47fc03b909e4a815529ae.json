@@ -1,0 +1,14 @@
+{
+  "data": {
+    "category": "Alimentación",
+    "confidence": 0.9,
+    "reasons": [
+      "ai:La transacción corresponde a la compra de 'manzanas', un producto típicamente asociado a la categoría de Alimentación. El monto de ARS 3.000,00 también es coherente con una compra de este tipo de producto en el mercado argentino."
+    ],
+    "merchant_clean": "",
+    "dedupHash": "2c06c089b4af0114a8bae2879df3f5079e667a65",
+    "aiEnhanced": true,
+    "aiReasoning": "La transacción corresponde a la compra de 'manzanas', un producto típicamente asociado a la categoría de Alimentación. El monto de ARS 3.000,00 también es coherente con una compra de este tipo de producto en el mercado argentino."
+  },
+  "timestamp": 1763505117610
+}

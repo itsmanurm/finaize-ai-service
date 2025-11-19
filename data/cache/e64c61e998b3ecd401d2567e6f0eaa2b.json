@@ -1,0 +1,14 @@
+{
+  "data": {
+    "category": "Tecnología",
+    "confidence": 0.9,
+    "reasons": [
+      "ai:La transacción se refiere a la compra de una computadora, lo cual se clasifica dentro de la categoría de Tecnología. El monto elevado y la descripción genérica apuntan a una adquisición de un equipo tecnológico de alto valor."
+    ],
+    "merchant_clean": "Co Utadora",
+    "dedupHash": "b7600512f65cf36f212533b65eba918a2a75c398",
+    "aiEnhanced": true,
+    "aiReasoning": "La transacción se refiere a la compra de una computadora, lo cual se clasifica dentro de la categoría de Tecnología. El monto elevado y la descripción genérica apuntan a una adquisición de un equipo tecnológico de alto valor."
+  },
+  "timestamp": 1763505392445
+}

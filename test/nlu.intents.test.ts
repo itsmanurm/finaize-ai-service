@@ -57,12 +57,11 @@ describe('NLU Intents - Robustness', () => {
       const result = await parseMessage(message);
       expect(result.intent).toBe(expectedIntent);
       expect(result.confidence).toBeGreaterThan(0.7);
+      // Ajustar el test para usar el nuevo tipo de entidades
       if (expectedEntities) {
         expect(result.entities).toBeDefined();
-        const ents: Record<string, any> = result.entities || {};
-        for (const key of Object.keys(expectedEntities)) {
-          expect(ents[key]).toBe(expectedEntities[key]);
-        }
+        // comparar parcialmente las entidades esperadas (mejor práctica en tests)
+        expect(result.entities).toEqual(expect.objectContaining(expectedEntities));
       }
     });
   });

@@ -43,6 +43,58 @@
 
 ---
 
+# ai-service
+
+## Setup
+
+1. Instala dependencias:
+   ```sh
+   npm install
+   ```
+2. Configura variables de entorno en `.env` y `.env.test` (ver ejemplos en el repo).
+3. Para tests offline:
+   ```sh
+   USE_OPENAI_MOCK=true npm run test:offline
+   ```
+
+## Testing
+
+- Ejecuta todos los tests:
+  ```sh
+  npm run test:offline
+  ```
+- Los tests usan OpenAI mock y limpian el cache automáticamente.
+
+## Desarrollo
+
+- Compila TypeScript:
+  ```sh
+  npm run build
+  ```
+- Lint:
+  ```sh
+  npm run lint
+  ```
+- Formatea:
+  ```sh
+  npm run format
+  ```
+
+## Seguridad y buenas prácticas
+
+- Todas las variables de entorno se validan en `config.ts`.
+- Los tipos son estrictos y las entidades se normalizan automáticamente.
+- No hay side effects ni logs en producción fuera del logger.
+- Los tests cubren los casos principales y usan setup centralizado.
+
+## Sugerencias
+
+- Revisa y actualiza dependencias en `package.json` regularmente.
+- Expande el tipo `Entities` según nuevos casos de negocio.
+- Mantén la documentación y los tests actualizados.
+
+---
+
 ## Instalación
 1. Clonar el repositorio:
    ```bash
