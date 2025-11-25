@@ -1,5 +1,6 @@
 import { getOpenAIClient } from './openai-service';
 import { config } from '../config';
+import { parseRelativeDate, getArgentinaDate } from '../utils/date-parser';
 
 // Definir un tipo más estricto para las entidades
 export type Entities = {
@@ -71,9 +72,20 @@ export async function parseMessage(message: string): Promise<NLUResult> {
   }
   // Extracción de entidades mejorada
   let entities: Record<string, any> = {};
+  
+  // FECHAS RELATIVAS: ayer, anteayer, hace X días, el viernes, etc.
+  const relativeDate = parseRelativeDate(message);
+  if (relativeDate) {
+    entities.day = relativeDate.date.getDate();
+    entities.month = relativeDate.date.getMonth() + 1;
+    entities.year = relativeDate.date.getFullYear();
+    entities._dateDescription = relativeDate.description;
+    console.log('[NLU] Fecha relativa detectada:', relativeDate.description, '→', relativeDate.date.toISOString().split('T')[0]);
+  }
+  
   // Si pregunta por "este mes", extraer el mes actual
   if (/este mes/i.test(message)) {
-    const now = new Date();
+    const now = getArgentinaDate();
     entities.month = now.getMonth() + 1;
     entities.year = now.getFullYear();
   }
