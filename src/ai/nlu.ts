@@ -26,6 +26,7 @@ type NLUResult = {
 
 // Reglas simples y deterministas para intents comunes
 const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
+  { name: 'analyze_financial_profile', re: /\b(mi perfil|perfil financiero|analiza mi|cómo gasto|cómo es mi|mi comportamiento|mis hábitos|mi salud financiera|qué tipo de|mi situación financiera)\b/i },
   { name: 'query_top_expenses', re: /gastos? (altos|mayores|de m[aá]s|inusuales|importantes|más altos|más grandes|más importantes)/i },
   { name: 'add_expense', re: /\b(gast[oó]|pagu[eé]|registrar gasto|agrega un gasto|añadir gasto)\b/i },
   { name: 'query_summary', re: /\b(cu[aá]nto|mostrame|mu[eé]strame|resumen|gastos|balance|¿en qu[eé])\b/i },
@@ -311,7 +312,20 @@ IMPORTANTE - Deadlines para metas:
 
 Reglas:
 - Si el usuario hace preguntas generales sobre cómo ahorrar, invertir, comprar activos, consejos financieros, educación financiera, SIN mencionar montos específicos, responde con intent "general_knowledge" y extrae topic (ej: ahorro, inversión, presupuesto, deudas, criptomonedas, etc).
+- Si el usuario pregunta por su perfil financiero, comportamiento de gastos, hábitos, salud financiera, análisis personal (ej: "¿cuál es mi perfil?", "¿cómo gasto?", "analiza mi comportamiento", "mi situación financiera"), responde con intent "analyze_financial_profile" y extrae timeframeMonths (número de meses a analizar, default: 6).
 - Si el usuario menciona INGRESOS, ganancias, cobros, salarios (ej: "gané", "cobré", "me pagaron", "recibí dinero"), responde con intent "add_income" y extrae amount, currency, source (fuente del ingreso), category, year, month, day, account, paymentMethod.
+
+Mensaje: "¿Cuál es mi perfil financiero?"
+Respuesta: {"intent": "analyze_financial_profile", "confidence": 0.99, "entities": {}}
+
+Mensaje: "Analiza mi comportamiento de gastos"
+Respuesta: {"intent": "analyze_financial_profile", "confidence": 0.98, "entities": {}}
+
+Mensaje: "¿Cómo está mi salud financiera?"
+Respuesta: {"intent": "analyze_financial_profile", "confidence": 0.98, "entities": {}}
+
+Mensaje: "¿Qué tipo de gastador soy?"
+Respuesta: {"intent": "analyze_financial_profile", "confidence": 0.97, "entities": {}}
 - Si el usuario menciona "quiero gastar", "gastar solo", "gastar máximo", "presupuesto", "no gastar más de", "asigno" (para presupuesto), responde con intent "create_budget" y extrae category, month, year, amount.
 - Si el usuario expresa un deseo de COMPRAR o AHORRAR PARA algo específico (ej: "quiero ahorrar", "meta de", "objetivo de"), responde con intent "create_goal" y extrae amount, currency, description, category, deadline (si se menciona), year, month.
 - Si el usuario menciona que YA AHORRÓ o AGREGÓ dinero a una meta existente (ej: "ahorré", "guardé", "puse", "agregué"), responde con intent "add_contribution" y extrae amount, goalName (nombre de la meta), description.

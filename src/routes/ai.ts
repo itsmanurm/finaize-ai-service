@@ -3,6 +3,7 @@ import { ItemSchema, FeedbackSchema, SummarizeSchema } from '../ai/schema';
 import { categorize } from '../ai/service';
 import { appendJsonl } from '../utils/jsonl';
 import { parseMessage } from '../ai/nlu';
+import { analyzeFinancialProfile, formatProfileForChat } from '../ai/profile-analyzer';
 
 const r = Router();
 
@@ -167,6 +168,41 @@ r.post('/test-cases', async (req, res) => {
   }));
 
   res.json({ ok: true, results });
+});
+
+/** POST /ai/analyze-profile - Analiza el perfil financiero del usuario */
+r.post('/analyze-profile', async (req, res) => {
+  const { transactions, budgets, goals, timeframeMonths } = req.body || {};
+
+  if (!Array.isArray(transactions) || transactions.length === 0) {
+    return res.status(400).json({ 
+      ok: false, 
+      error: 'Se requiere un array de transacciones con al menos 1 elemento' 
+    });
+  }
+
+  try {
+    console.log(`[AI Analyze Profile] Analizando ${transactions.length} transacciones, ${timeframeMonths || 6} meses`);
+
+    const profile = analyzeFinancialProfile({
+      transactions,
+      budgets: budgets || [],
+      goals: goals || [],
+      timeframeMonths: timeframeMonths || 6
+    });
+
+    return res.json({ 
+      ok: true, 
+      ...profile 
+    });
+  } catch (error: any) {
+    console.error('[AI Analyze Profile] Error:', error);
+    return res.status(500).json({ 
+      ok: false, 
+      error: 'Error analizando perfil', 
+      details: error.message 
+    });
+  }
 });
 
 export default r;
