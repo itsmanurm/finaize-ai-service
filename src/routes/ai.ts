@@ -16,11 +16,26 @@ r.post('/parse', async (req, res) => {
   }
 
   try {
+    console.log(`[AI Parse] Processing message: "${message.substring(0, 50)}..."`);
     const result = await parseMessage(message);
+    
+    // Log resultado
+    console.log(`[AI Parse] Result - Intent: ${result.intent}, Confidence: ${result.confidence}`);
+    
     return res.json({ ok: true, ...result });
   } catch (error: any) {
     console.error('[AI Parse] Error:', error);
-    return res.status(500).json({ ok: false, error: 'Error procesando mensaje', details: error.message });
+    
+    // Fallback: retornar unknown intent pero no fallar
+    return res.status(500).json({ 
+      ok: false, 
+      error: 'Error procesando mensaje',
+      fallback: {
+        intent: 'unknown',
+        confidence: 0.1,
+        entities: {}
+      }
+    });
   }
 });
 

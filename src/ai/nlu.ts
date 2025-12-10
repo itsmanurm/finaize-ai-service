@@ -10,7 +10,8 @@ export type Entities = {
   currency?: 'ARS' | 'USD' | 'EUR' | 'PESOS' | 'DOLARES' | 'EUROS' | string;
   month?: number; // 1-12
   year?: number;
-  period?: 'mes' | 'mes_actual' | 'año' | 'semana' | 'hoy' | 'trimestre' | string;
+  period?: 'mes' | 'mes_actual' | 'año' | 'semana' | 'hoy' | 'trimestre' | 'all_time' | string;
+  all_time?: boolean; // Indica "desde que abrió la cuenta"
   tipo?: 'mejores' | 'subiendo' | 'recomendación' | 'inusual' | 'reducible' | 'conveniencia' | 'recurrente' | string;
   activo?: 'cedear' | 'criptomoneda' | 'acción' | 'fondo común de inversión' | string;
   items?: any[];
@@ -24,14 +25,61 @@ type NLUResult = {
   entities: Entities;
 };
 
+/**
+ * Logger helper para NLU
+ */
+function logNLU(level: 'info' | 'warn' | 'error', msg: string, data?: any) {
+  const timestamp = new Date().toISOString();
+  const logMsg = `[${timestamp}] [NLU] ${msg}`;
+  if (level === 'error') {
+    console.error(logMsg, data || '');
+  } else if (level === 'warn') {
+    console.warn(logMsg, data || '');
+  } else {
+    console.log(logMsg, data || '');
+  }
+}
+
 // Reglas simples y deterministas para intents comunes
+// Ordenadas por especificidad (más específicas primero)
 const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
-  { name: 'analyze_financial_profile', re: /\b(mi perfil|perfil financiero|analiza mi|cómo gasto|cómo es mi|mi comportamiento|mis hábitos|mi salud financiera|qué tipo de|mi situación financiera)\b/i },
-  { name: 'query_top_expenses', re: /gastos? (altos|mayores|de m[aá]s|inusuales|importantes|más altos|más grandes|más importantes)/i },
-  { name: 'add_expense', re: /\b(gast[oó]|pagu[eé]|registrar gasto|agrega un gasto|añadir gasto)\b/i },
-  { name: 'query_summary', re: /\b(cu[aá]nto|mostrame|mu[eé]strame|resumen|gastos|balance|¿en qu[eé])\b/i },
-  { name: 'create_goal', re: /\b(meta|ahorrar|guardar|objetivo)\b/i },
-  { name: 'categorize', re: /\b(categor[ií]a|¿en qu[eé] categor|en qu[eé] entra)\b/i },
+  // Análisis de perfil
+  { name: 'analyze_financial_profile', re: /\b(mi perfil|perfil financiero|analiza mi comportamiento|cómo gasto|cómo es mi gasto|mis hábitos de gasto|mi salud financiera|qué tipo de gastador|mi situación financiera|análisis de mis|estudia mi patrón)\b/i },
+  
+  // Comparación entre períodos
+  { name: 'query_comparison', re: /(comparar|comparada?|comparado|en comparaci[óo]n\s+a|versus|vs\.|frente a).*(año|mes|periodo|trimestre|mes pasado|año pasado)/i },
+  { name: 'query_comparison', re: /gastos?.*comparaci[óo]n.*(año|mes|periodo)/i },
+  
+  // Top gastos/ingresos
+  { name: 'query_top_expenses', re: /\b(gastos? (altos|mayores|de m[aá]s|inusuales|importantes|más altos|más grandes|top|principales)|mayores gastos|gastos principales)\b/i },
+  { name: 'query_top_expenses', re: /\b(mis mayores|top 5|ranking de).*gasto/i },
+  
+  // Resumen/balance
+  { name: 'query_summary', re: /\b(cuánto gasté?|cuánto gasto|resumen|balance|total de gastos|mis gastos|cuál fue|en el (mes|año|trimestre))\b/i },
+  { name: 'query_summary', re: /\b(desde que|en los últimos|últimos \d+ (días|meses)).*gast/i },
+  
+  // Gastos/ingresos
+  { name: 'add_expense', re: /\b(gasté|gaste|pagué|pague|gasto|registrar gasto|agregar gasto|anotar gasto|transferí|transfer|deposité|pagué con)\b/i },
+  { name: 'add_income', re: /\b(gané|gane|cobré|cobre|recibí|me pagaron|ingreso|percibí|sueldo|salario)\b/i },
+  
+  // Presupuestos
+  { name: 'create_budget', re: /\b(presupuesto|presupuesto de|gastar máximo|quiero gastar|asigno|asignar|límite de gasto)\b/i },
+  { name: 'create_budget', re: /\b(en.*no gastar más de|un máximo de.*para)\b/i },
+  
+  // Metas/objetivos
+  { name: 'create_goal', re: /\b(meta|ahorrar|ahorro|guardar|objetivo|juntar|poner aparte para)\b/i },
+  { name: 'create_goal', re: /\b(quiero juntar|quiero ahorrar|mi meta es|objetivo de)\b/i },
+  { name: 'add_contribution', re: /\b(ahorré|ahorre|guardé|guarde|puse|agregué|agregue|deposité|deposite)\b/i },
+  
+  // Categorización
+  { name: 'categorize', re: /\b(categoría|¿en qué categor|en qué entra|¿a qué categor)\b/i },
+  { name: 'categorize', re: /\b(categorizar|clasificar)\b/i },
+  
+  // Educación financiera
+  { name: 'general_knowledge', re: /\b(cómo|cómo hago|cómo puedo|qué es|cuál es|enseña|explica|tips?|consejos?|aprende?|estrategia)\b.*\b(ahorr|presupuest|deud|inversi[óo]n|ahorro|cripto|finanz|dinero|gasto)\b/i },
+  
+  // Análisis de perfil (alto peso)
+  { name: 'analyze_financial_profile', re: /analizar.*perfil/i },
 ];
 
 export async function parseMessage(message: string): Promise<NLUResult> {
@@ -74,18 +122,28 @@ export async function parseMessage(message: string): Promise<NLUResult> {
   // Extracción de entidades mejorada
   let entities: Record<string, any> = {};
   
-  // FECHAS RELATIVAS: ayer, anteayer, hace X días, el viernes, etc.
-  const relativeDate = parseRelativeDate(message);
-  if (relativeDate) {
-    entities.day = relativeDate.date.getDate();
-    entities.month = relativeDate.date.getMonth() + 1;
-    entities.year = relativeDate.date.getFullYear();
-    entities._dateDescription = relativeDate.description;
-    console.log('[NLU] Fecha relativa detectada:', relativeDate.description, '→', relativeDate.date.toISOString().split('T')[0]);
+  // PRIMERO: Detectar "desde que abrí la cuenta" - debe ser ANTES de extraer años/meses
+  // Esto evita que se asigne año/mes cuando el usuario pregunta sin periodo específico
+  if (/desde que\s+(abr[ií]|abierta?|tens|tengo|cuenta|inicio)/i.test(message) || /desde que abr/i.test(message)) {
+    entities.all_time = true;
+    entities.period = 'all_time';
+    logNLU('info', 'Detected all_time period: "desde que abrí la cuenta"');
+  }
+
+  // FECHAS RELATIVAS: ayer, anteayer, hace X días, el viernes, etc. (solo si no es all_time)
+  if (!entities.all_time) {
+    const relativeDate = parseRelativeDate(message);
+    if (relativeDate) {
+      entities.day = relativeDate.date.getDate();
+      entities.month = relativeDate.date.getMonth() + 1;
+      entities.year = relativeDate.date.getFullYear();
+      entities._dateDescription = relativeDate.description;
+      logNLU('info', `Fecha relativa detectada: ${relativeDate.description}`);
+    }
   }
   
-  // Si pregunta por "este mes", extraer el mes actual
-  if (/este mes/i.test(message)) {
+  // Si pregunta por "este mes", extraer el mes actual (solo si no es all_time)
+  if (!entities.all_time && /este mes/i.test(message)) {
     const now = getArgentinaDate();
     entities.month = now.getMonth() + 1;
     entities.year = now.getFullYear();
@@ -100,34 +158,68 @@ export async function parseMessage(message: string): Promise<NLUResult> {
   // Moneda
   const currencyMatch = message.match(/\b(ARS|USD|EUR|pesos?|d[oó]lares?|euros?)\b/i);
   if (currencyMatch) entities.currency = currencyMatch[1].toUpperCase();
-  // Comercio (merchant)
-  // Ej: "a Juan", "en Carrefour", "a Mercado Libre", "transferí a Juan"
+  // Comercio (merchant) vs Categoría
+  // IMPORTANTE: Distinguir entre "en transporte" (categoría) vs "en Carrefour" (merchant)
+  // Categorías comunes que el usuario menciona
+  const knownCategories = [
+    'transporte', 'comida', 'restaurante', 'supermercado', 'farmacia', 'gasolina',
+    'servicios', 'agua', 'luz', 'gas', 'internet', 'teléfono', 'cine', 'entretenimiento',
+    'ropa', 'zapatos', 'ropa deportiva', 'deportes', 'fitness', 'salud', 'médico',
+    'educación', 'cursos', 'libros', 'tecnología', 'electrónica', 'casa', 'muebles',
+    'limpieza', 'higiene', 'belleza', 'peluquería', 'masajes', 'viajes', 'hotel', 'vuelos',
+    'seguros', 'impuestos', 'suscripciones', 'streaming', 'música', 'juegos', 'mascotas'
+  ];
+  
   let merchant = '';
-  // Buscar "transferí a [nombre]"
-  const merchantMatchTransfer = message.match(/transfer[ií]\s+a\s+([A-Za-z0-9áéíóúüñ\-]+)/i);
-  if (merchantMatchTransfer) merchant = merchantMatchTransfer[1].trim();
-  // Buscar "a [nombre]", "en [nombre]", "para [nombre]" (permitir signos de puntuación, interrogación, etc.)
-  if (!merchant) {
-    const merchantMatchGeneral = message.match(/(?:a|en|para)\s+([A-Za-z0-9áéíóúüñ\-]+)(?=\s|\?|\.|,|$)/i);
+  let category = '';
+  
+  // Buscar en el mensaje patrones como "en [CATEGORIA]" o "en [MERCHANT]"
+  const enPattern = message.match(/en\s+([A-Za-z0-9áéíóúüñ\-]+)(?:\s|,|\?|$)/i);
+  if (enPattern) {
+    const candidato = enPattern[1].toLowerCase();
+    // Si es una categoría conocida, guardar como category
+    if (knownCategories.some(c => candidato.includes(c) || c.includes(candidato))) {
+      category = candidato;
+    } else {
+      // Si no, es un merchant
+      merchant = candidato;
+    }
+  }
+  
+  // Buscar "transferí a [nombre]" - siempre merchant
+  if (!merchant && !category) {
+    const merchantMatchTransfer = message.match(/transfer[ií]\s+a\s+([A-Za-z0-9áéíóúüñ\-]+)/i);
+    if (merchantMatchTransfer) merchant = merchantMatchTransfer[1].trim();
+  }
+  
+  // Buscar "a [nombre]", "para [nombre]" - generalmente merchant
+  if (!merchant && !category) {
+    const merchantMatchGeneral = message.match(/(?:a|para)\s+([A-Za-z0-9áéíóúüñ\-]+)(?=\s|\?|\.|,|$)/i);
     if (merchantMatchGeneral) merchant = merchantMatchGeneral[1].trim();
   }
-  // Fallback: si el intent es transferencia o query_summary y hay "a [nombre]" en la pregunta
-  if (!merchant) {
-    const fallbackMatch = message.match(/a\s+([A-Za-z0-9áéíóúüñ\-]+)(?=\s|\?|\.|,|$)/i);
-    if (fallbackMatch) merchant = fallbackMatch[1].trim();
+  
+  // Buscar explícita mención de categoría: "categoría [PALABRA]"
+  if (!category) {
+    const categoryMatch = message.match(/categor[ií]a\s+([A-Za-z0-9\sáéíóúüñ\-]+)/i);
+    if (categoryMatch) category = categoryMatch[1].trim();
   }
+  
   if (merchant) entities.merchant = merchant;
-  // Categoría
-  const categoryMatch = message.match(/categor[ií]a\s+([A-Za-z0-9\sáéíóúüñ\-]+)/i);
-  if (categoryMatch) entities.category = categoryMatch[1].trim();
-  // Año
-  const yearMatch = message.match(/(20\d{2})/);
-  if (yearMatch) entities.year = Number(yearMatch[1]);
-  // Mes
-  const monthMatch = message.match(/enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre/i);
-  if (monthMatch) {
-    const months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-    entities.month = months.findIndex(m => m === monthMatch[0].toLowerCase()) + 1;
+  if (category) entities.category = category;
+  
+  // Año (solo si no es all_time)
+  if (!entities.all_time) {
+    const yearMatch = message.match(/(20\d{2})/);
+    if (yearMatch) entities.year = Number(yearMatch[1]);
+  }
+  
+  // Mes (solo si no es all_time)
+  if (!entities.all_time) {
+    const monthMatch = message.match(/enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre/i);
+    if (monthMatch) {
+      const months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      entities.month = months.findIndex(m => m === monthMatch[0].toLowerCase()) + 1;
+    }
   }
 
   // Detectar montos (puede haber múltiples montos en un solo mensaje)
@@ -240,6 +332,7 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
   for (const r of INTENT_RULES) {
     if (r.re.test(message)) {
       matchedIntent = r.name;
+      logNLU('info', `Intent matched by rule: ${r.name}`);
       break;
     }
   }
@@ -270,6 +363,7 @@ ENTIDADES A EXTRAER según el intent:
 - Para categorías: name, type ("income" o "expense"), icon, color, budgetLimit
 
 IMPORTANTE - Referencias temporales:
+- Si el usuario pregunta "desde que abrí la cuenta", "desde que tengo cuenta", "desde el inicio": NO extraer year ni month. En su lugar, poner: all_time: true
 - Año actual: ${currentYear}
 - Mes actual: ${currentMonth}
 - Día actual: ${now.getDate()}
@@ -281,6 +375,7 @@ IMPORTANTE - Referencias temporales:
 - Si el usuario dice "este mes", usar month: ${currentMonth}, year: ${currentYear}
 - Si no se menciona mes, usar month: ${currentMonth}
 - Si no se menciona año, usar year: ${currentYear}
+- IMPORTANTE: Si all_time es true, NO incluir year ni month en entities
 
 IMPORTANTE - Método de pago:
 - Si menciona "tarjeta", "con tarjeta", "pagué con débito": paymentMethod: "debito"
@@ -348,25 +443,53 @@ Respuesta: {"intent": "analyze_financial_profile", "confidence": 0.97, "entities
     });
 
     const content = completion.choices?.[0]?.message?.content || '';
-    const jsonStart = content.indexOf('{');
-    if (jsonStart >= 0) {
-      const jsonText = content.slice(jsonStart);
-        try {
-          const parsed = JSON.parse(jsonText);
-          return {
-            intent: parsed.intent || matchedIntent || 'unknown',
-            confidence: parsed.confidence || (matchedIntent ? 0.95 : 0.5),
-            entities: normalizeEntities({ ...entities, ...(parsed.entities || {}) })
-          };
-        } catch (e) {
-          console.warn('[NLU] Error parseando JSON OpenAI:', e);
-          return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.3, entities };
-        }
+    
+    // Validar que OpenAI retornó algo
+    if (!content || content.trim().length === 0) {
+      logNLU('warn', 'OpenAI returned empty content, using rule-based fallback');
+      return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.2, entities: normalizeEntities(entities) };
     }
-
-    return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.2, entities: normalizeEntities(entities) };
+    
+    // Extraer JSON de la respuesta (puede estar embebido en texto)
+    const jsonStart = content.indexOf('{');
+    const jsonEnd = content.lastIndexOf('}');
+    
+    if (jsonStart >= 0 && jsonEnd > jsonStart) {
+      const jsonText = content.slice(jsonStart, jsonEnd + 1);
+      try {
+        const parsed = JSON.parse(jsonText);
+        logNLU('info', `OpenAI parsed intent: ${parsed.intent}, confidence: ${parsed.confidence}`);
+        
+        // Validar que al menos tenemos intent
+        if (!parsed.intent) {
+          logNLU('warn', 'OpenAI response missing intent field');
+          return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.3, entities: normalizeEntities(entities) };
+        }
+        
+        return {
+          intent: parsed.intent || matchedIntent || 'unknown',
+          confidence: Math.min(1.0, Math.max(0, parsed.confidence || (matchedIntent ? 0.95 : 0.5))),
+          entities: normalizeEntities({ ...entities, ...(parsed.entities || {}) })
+        };
+      } catch (e) {
+        logNLU('warn', `JSON parse error: ${(e as any)?.message}`, { jsonText: jsonText.substring(0, 100) });
+        return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.3, entities: normalizeEntities(entities) };
+      }
+    } else {
+      logNLU('warn', 'OpenAI response does not contain JSON, using rule fallback');
+      return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.2, entities: normalizeEntities(entities) };
+    }
   } catch (err) {
-    console.warn('[NLU] OpenAI fallback failed:', (err as any)?.message || err);
-    return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.2, entities };
+    const errMsg = (err as any)?.message || String(err);
+    logNLU('error', `OpenAI API error: ${errMsg}`);
+    
+    // Fallback final: usar intent rule-based
+    if (matchedIntent) {
+      logNLU('info', `Using rule-based fallback intent: ${matchedIntent}`);
+      return { intent: matchedIntent, confidence: 0.8, entities: normalizeEntities(entities) };
+    }
+    
+    // Si ni siquiera hay rule match, retornar unknown
+    return { intent: 'unknown', confidence: 0.2, entities: normalizeEntities(entities) };
   }
 }
