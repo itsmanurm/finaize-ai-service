@@ -1,3 +1,13 @@
+// Polyfill para canvas en Node.js
+if (typeof global !== 'undefined' && !('DOMMatrix' in global)) {
+  (global as any).DOMMatrix = class DOMMatrix {
+    m11 = 1; m12 = 0; m13 = 0; m14 = 0;
+    m21 = 0; m22 = 1; m23 = 0; m24 = 0;
+    m31 = 0; m32 = 0; m33 = 1; m34 = 0;
+    m41 = 0; m42 = 0; m43 = 0; m44 = 1;
+  };
+}
+
 import dotenv from 'dotenv';
 dotenv.config();
 import 'dotenv/config';
@@ -14,6 +24,7 @@ import aiRoutes from './routes/ai';
 import chatRoutes from './routes/chat';
 import metaRoutes from './routes/meta';
 import metaEnhancedRoutes from './routes/meta-enhanced';
+import documentsRoutes from './routes/documents';
 
 const PORT = Number(process.env.PORT ?? 8081);
 const ORIGIN = process.env.CORS_ORIGIN ?? '*';
@@ -28,7 +39,8 @@ app.use(pinoHttp({
 }));
 
 app.use(cors({ origin: ORIGIN }));
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ limit: '15mb', extended: true }));
 app.use(morgan('dev'));
 
 // Endpoints de vida/estado (públicos)
@@ -58,6 +70,8 @@ app.use('/ai', chatRoutes);
 app.use('/ai', metaRoutes);
 // Rutas de métricas avanzadas (también protegidas)
 app.use('/ai', metaEnhancedRoutes);
+// Rutas de análisis de documentos
+app.use('/ai/documents', documentsRoutes);
 
 // Propagar X-Request-Id
 app.use((req, res, next) => {
