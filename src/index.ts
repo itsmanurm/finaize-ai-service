@@ -25,6 +25,7 @@ import chatRoutes from './routes/chat';
 import metaRoutes from './routes/meta';
 import metaEnhancedRoutes from './routes/meta-enhanced';
 import documentsRoutes from './routes/documents';
+import agentRoutes from './routes/agent';
 
 const PORT = Number(process.env.PORT ?? 8081);
 const ORIGIN = process.env.CORS_ORIGIN ?? '*';
@@ -72,6 +73,7 @@ app.use('/ai', metaRoutes);
 app.use('/ai', metaEnhancedRoutes);
 // Rutas de análisis de documentos
 app.use('/ai/documents', documentsRoutes);
+app.use('/ai/agent', agentRoutes);
 
 // Propagar X-Request-Id
 app.use((req, res, next) => {

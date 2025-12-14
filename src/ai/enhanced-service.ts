@@ -3,6 +3,7 @@ import { rulesCategory } from './rule-engine';
 import { createHash } from 'crypto';
 import { getCachedCategorization, setCachedCategorization } from './cache';
 import { categorizeWithOpenAI } from './openai-service';
+import { consultMemory } from './learning-service';
 import { config } from '../config';
 
 type Currency = 'ARS' | 'USD';
@@ -15,7 +16,17 @@ export interface CategorizeInput {
   when?: string;
   accountLast4?: string;
   bankMessageId?: string;
-  useAI?: boolean; // Nuevo campo para forzar uso de IA
+  useAI?: boolean;
+
+  // Contexto para IA
+  previousTransactions?: Array<{
+    description: string;
+    amount: number;
+    category?: string;
+  }>;
+  userProfile?: {
+    commonMerchants?: string[];
+  };
 }
 
 export interface CategorizeOutput {
@@ -40,7 +51,7 @@ function dedupHash(v: {
 }) {
   const parts = [
     Math.abs(Number(v.amount)).toFixed(2),
-    (v.when ?? '').slice(0,10),
+    (v.when ?? '').slice(0, 10),
     (v.merchant_clean ?? '').toLowerCase(),
     (v.accountLast4 ?? '').trim(),
     (v.bankMessageId ?? '').trim()
@@ -56,12 +67,43 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
     amount: input.amount,
     currency: input.currency
   };
-  
+
   const cached = await getCachedCategorization(cacheKey);
   if (cached) {
     return cached;
   }
-  
+
+  // Verificar aprendizaje del usuario (Feedback Loop)
+  // Esto tiene precedencia sobre Regex y OpenAI porque es lo que el usuario quiere explícitamente
+  const userLearned = await consultMemory({
+    merchant: input.merchant,
+    description: input.description
+  });
+
+  if (userLearned) {
+    const result: CategorizeOutput = {
+      category: userLearned.category,
+      confidence: userLearned.confidence,
+      reasons: [`learned:${userLearned.source} (${userLearned.count} votes)`],
+      merchant_clean: normalizeMerchant(input.merchant || ''),
+      dedupHash: '', // Se generará abajo si se necesita
+      aiEnhanced: false // No es IA generativa, es memoria
+    };
+    // Calcular hash para consistencia
+    const merchant_clean = normalizeMerchant(input.merchant || '');
+    result.dedupHash = dedupHash({
+      amount: input.amount,
+      when: input.when,
+      merchant_clean,
+      accountLast4: input.accountLast4,
+      bankMessageId: input.bankMessageId
+    });
+
+    // Guardar en cache para futuro inmediato
+    await setCachedCategorization(cacheKey, result);
+    return result;
+  }
+
   const merchant_clean = normalizeMerchant(input.merchant || '');
   const bag = [merchant_clean, input.description].filter(Boolean).join(' ').trim();
 
@@ -83,7 +125,7 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
   if (isNaN(minConf) || minConf <= 0 || minConf > 1) {
     console.warn('AI_MIN_CONFIDENCE no está configurado correctamente. Usando valor por defecto: 0.6');
   }
-  
+
   // Intentar OpenAI si:
   // 1. useAI es true
   // 2. No hay match de reglas regex
@@ -106,7 +148,10 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
               merchant: input.merchant,
               amount: input.amount,
               currency: input.currency,
-              context: { recentTransactions: [] }
+              context: {
+                recentTransactions: input.previousTransactions || [],
+                userProfile: input.userProfile
+              }
             });
 
             const res: CategorizeOutput = {
@@ -155,7 +200,7 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
 
   // Aplicar reglas regex
   let result: CategorizeOutput;
-  
+
   if ((rule as any).hit) {
     const conf = Math.min(1, (rule as any).strength);
     let category: string;
@@ -195,7 +240,7 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
       aiEnhanced: false
     };
   }
-  
+
   // Guardar en cache
   await setCachedCategorization(cacheKey, result);
   return result;
@@ -210,11 +255,11 @@ export async function categorizeBatch(
 ): Promise<CategorizeOutput[]> {
   const { useAI = false, maxConcurrency = 3 } = options || {};
   const results: CategorizeOutput[] = [];
-  
+
   // Procesar en lotes para evitar sobrecarga
   for (let i = 0; i < inputs.length; i += maxConcurrency) {
     const batch = inputs.slice(i, i + maxConcurrency);
-    
+
     const batchPromises = batch.map(async (input) => {
       try {
         return await categorize({ ...input, useAI });
@@ -231,15 +276,15 @@ export async function categorizeBatch(
         };
       }
     });
-    
+
     const batchResults = await Promise.all(batchPromises);
     results.push(...batchResults);
-    
+
     // Pequeño delay entre lotes
     if (i + maxConcurrency < inputs.length) {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
   }
-  
+
   return results;
 }
