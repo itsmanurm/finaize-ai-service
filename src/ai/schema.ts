@@ -38,3 +38,30 @@ export const SummarizeSchema = z.object({
   useAI: z.boolean().optional().default(false)
 });
 export type SummarizeInput = z.infer<typeof SummarizeSchema>;
+
+// -- DS / Analytics Schemas --
+
+export const TransactionSchema = z.object({
+  _id: z.string().optional(),
+  id: z.string().optional(),
+  amount: z.number(),
+  date: z.union([z.string(), z.date()]).optional(),
+  when: z.union([z.string(), z.date()]).optional(), // Alias común en el proyecto
+  description: z.string().optional(),
+  category: z.string().optional(),
+  merchant: z.string().optional()
+});
+export type TransactionInput = z.infer<typeof TransactionSchema>;
+
+export const ForecastRequestSchema = z.object({
+  transactions: z.array(TransactionSchema),
+  category: z.string().optional(),
+  horizonDays: z.number().min(1).max(365).default(30)
+});
+export type ForecastRequestInput = z.infer<typeof ForecastRequestSchema>;
+
+export const AnomalyRequestSchema = z.object({
+  transactions: z.array(TransactionSchema),
+  threshold: z.number().min(0.1).max(10).optional().default(3.5)
+});
+export type AnomalyRequestInput = z.infer<typeof AnomalyRequestSchema>;
