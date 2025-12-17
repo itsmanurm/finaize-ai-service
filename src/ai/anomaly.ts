@@ -52,7 +52,7 @@ export class AnomalyService {
                         description: t.description || 'Sin descripción',
                         category: cat,
                         severity: score > 8 ? 'high' : (score > 5 ? 'medium' : 'low'),
-                        reason: `Gasto inusual de $${val} en '${cat}' (Mediana: $${median.toFixed(0)}). Score: ${score.toFixed(1)}`
+                        reason: `Gasto inusual de $${val.toLocaleString('es-AR')} en '${cat}' (Mediana: $${median.toLocaleString('es-AR', { maximumFractionDigits: 0 })}). Score: ${score.toFixed(1)}`
                     });
                 }
             }
