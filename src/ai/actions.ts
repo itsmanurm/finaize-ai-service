@@ -1,96 +1,96 @@
-  // Acción mock: consulta de mercado/inversión
-  export async function queryMarketInfo(payload: { activo?: string; period?: string; tipo?: string }) {
-    // Simulación de respuesta para CEDEARs, acciones, criptos
-    if (payload.activo === 'cedear') {
-      return {
-        ok: true,
-        activos: [
-          { nombre: 'Apple (AAPL)', variacion: '+2.1%', precio: 180 },
-          { nombre: 'Mercado Libre (MELI)', variacion: '+1.8%', precio: 1450 },
-          { nombre: 'Tesla (TSLA)', variacion: '+2.5%', precio: 240 }
-        ],
-        periodo: payload.period || 'hoy',
-        tipo: payload.tipo || 'mejores'
-      };
-    }
-    if (payload.activo === 'criptomoneda') {
-      return {
-        ok: true,
-        activos: [
-          { nombre: 'Bitcoin', variacion: '+5.2%', precio: 65000 },
-          { nombre: 'Ethereum', variacion: '+3.8%', precio: 3400 }
-        ],
-        periodo: payload.period || 'semana',
-        tipo: payload.tipo || 'subiendo'
-      };
-    }
-    if (payload.activo === 'acción') {
-      return {
-        ok: true,
-        activos: [
-          { nombre: 'Globant', variacion: '+4.1%', precio: 210 },
-          { nombre: 'YPF', variacion: '+2.9%', precio: 12 }
-        ],
-        periodo: payload.period || 'mes',
-        tipo: payload.tipo || 'recomendación'
-      };
-    }
-    return { ok: false, activos: [], periodo: payload.period, tipo: payload.tipo };
-  }
-  // Helper de normalización reutilizable
-  function normalize(str: string = '') {
-    return String(str)
-      .toLowerCase()
-      .replace(/[áàäâ]/g, 'a')
-      .replace(/[éèëê]/g, 'e')
-      .replace(/[íìïî]/g, 'i')
-      .replace(/[óòöô]/g, 'o')
-      .replace(/[úùüû]/g, 'u')
-      .replace(/\s+/g, '');
-  }
-
-  // Acción: obtener los mayores gastos (extraída a función para evitar side-effects en top-level)
-  export async function queryTopExpenses(payload: { year?: number; month?: number } = {}) {
-    const fs = require('fs');
-    const path = require('path');
-    const filePath = path.join(process.cwd(), 'data', 'transactions.jsonl');
-    let lines: any[] = [];
-    try {
-      const raw = fs.readFileSync(filePath, 'utf8');
-      lines = raw.split('\n').filter(Boolean).map((l: string) => {
-        try { return JSON.parse(l); } catch { return null; }
-      }).filter(Boolean);
-    } catch {}
-
-    // Filtrar por mes/año
-    let filtered = lines as any[];
-    if (payload?.year) {
-      const yearStr = payload.year.toString();
-      filtered = filtered.filter((it: any) => {
-        const d = it.date || it.ts;
-        return d && d.startsWith(yearStr);
-      });
-    }
-    if (payload?.month) {
-      const monthNum = payload.month;
-      filtered = filtered.filter((it: any) => {
-        const d = it.date || it.ts;
-        const m = d ? Number(d.split('-')[1]) : null;
-        return m === monthNum;
-      });
-    }
-
-    // Solo gastos (monto positivo)
-    filtered = filtered.filter((it: any) => Number(it.amount) > 0);
-    // Ordenar por monto descendente y tomar top 3
-    const top = filtered.sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0)).slice(0, 3);
+// Acción mock: consulta de mercado/inversión
+export async function queryMarketInfo(payload: { activo?: string; period?: string; tipo?: string }) {
+  // Simulación de respuesta para CEDEARs, acciones, criptos
+  if (payload.activo === 'cedear') {
     return {
       ok: true,
-      topExpenses: top,
-      count: top.length,
-      filtro: { year: payload.year, month: payload.month }
+      activos: [
+        { nombre: 'Apple (AAPL)', variacion: '+2.1%', precio: 180 },
+        { nombre: 'Mercado Libre (MELI)', variacion: '+1.8%', precio: 1450 },
+        { nombre: 'Tesla (TSLA)', variacion: '+2.5%', precio: 240 }
+      ],
+      periodo: payload.period || 'hoy',
+      tipo: payload.tipo || 'mejores'
     };
   }
+  if (payload.activo === 'criptomoneda') {
+    return {
+      ok: true,
+      activos: [
+        { nombre: 'Bitcoin', variacion: '+5.2%', precio: 65000 },
+        { nombre: 'Ethereum', variacion: '+3.8%', precio: 3400 }
+      ],
+      periodo: payload.period || 'semana',
+      tipo: payload.tipo || 'subiendo'
+    };
+  }
+  if (payload.activo === 'acción') {
+    return {
+      ok: true,
+      activos: [
+        { nombre: 'Globant', variacion: '+4.1%', precio: 210 },
+        { nombre: 'YPF', variacion: '+2.9%', precio: 12 }
+      ],
+      periodo: payload.period || 'mes',
+      tipo: payload.tipo || 'recomendación'
+    };
+  }
+  return { ok: false, activos: [], periodo: payload.period, tipo: payload.tipo };
+}
+// Helper de normalización reutilizable
+function normalize(str: string = '') {
+  return String(str)
+    .toLowerCase()
+    .replace(/[áàäâ]/g, 'a')
+    .replace(/[éèëê]/g, 'e')
+    .replace(/[íìïî]/g, 'i')
+    .replace(/[óòöô]/g, 'o')
+    .replace(/[úùüû]/g, 'u')
+    .replace(/\s+/g, '');
+}
+
+// Acción: obtener los mayores gastos (extraída a función para evitar side-effects en top-level)
+export async function queryTopExpenses(payload: { year?: number; month?: number } = {}) {
+  const fs = require('fs');
+  const path = require('path');
+  const filePath = path.join(process.cwd(), 'data', 'transactions.jsonl');
+  let lines: any[] = [];
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    lines = raw.split('\n').filter(Boolean).map((l: string) => {
+      try { return JSON.parse(l); } catch { return null; }
+    }).filter(Boolean);
+  } catch { }
+
+  // Filtrar por mes/año
+  let filtered = lines as any[];
+  if (payload?.year) {
+    const yearStr = payload.year.toString();
+    filtered = filtered.filter((it: any) => {
+      const d = it.date || it.ts;
+      return d && d.startsWith(yearStr);
+    });
+  }
+  if (payload?.month) {
+    const monthNum = payload.month;
+    filtered = filtered.filter((it: any) => {
+      const d = it.date || it.ts;
+      const m = d ? Number(d.split('-')[1]) : null;
+      return m === monthNum;
+    });
+  }
+
+  // Solo gastos (monto positivo)
+  filtered = filtered.filter((it: any) => Number(it.amount) > 0);
+  // Ordenar por monto descendente y tomar top 3
+  const top = filtered.sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0)).slice(0, 3);
+  return {
+    ok: true,
+    topExpenses: top,
+    count: top.length,
+    filtro: { year: payload.year, month: payload.month }
+  };
+}
 import { appendJsonl } from '../utils/jsonl';
 import { categorize } from './enhanced-service';
 
@@ -131,7 +131,7 @@ export async function actionQuerySummary(payload: { items?: any[]; classifyMissi
     lines = raw.split('\n').filter(Boolean).map((l: string) => {
       try { return JSON.parse(l); } catch { return null; }
     }).filter(Boolean);
-  } catch {}
+  } catch { }
 
   // Filtrar por entidades
   let filtered: any[] = lines;
