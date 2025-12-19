@@ -46,13 +46,22 @@ export class AnomalyService {
                 const score = (0.6745 * (val - median)) / safeMad;
 
                 if (score > threshold) {
+                    const ratio = Math.round((val / median) * 100);
+                    let reason = '';
+                    if (score > 8) {
+                        reason = `¡Cuidado! Este gasto es completamente atípico: gastaste $${val.toLocaleString('es-AR')} en ${cat}, más de 3 veces lo que gastan normalmente ($${Math.round(median).toLocaleString('es-AR')}). Verificá si es correcto.`;
+                    } else if (score > 5) {
+                        reason = `Detectamos un gasto importante: $${val.toLocaleString('es-AR')} en ${cat}. Es bastante más que lo habitual ($${Math.round(median).toLocaleString('es-AR')}). ¿Fue intencional?`;
+                    } else {
+                        reason = `Notamos un gasto un poco elevado: $${val.toLocaleString('es-AR')} en ${cat}, por encima de tu promedio ($${Math.round(median).toLocaleString('es-AR')}). Solo para que lo tengas en cuenta.`;
+                    }
                     anomalies.push({
                         transactionId: t._id || t.id,
                         amount: t.amount,
                         description: t.description || 'Sin descripción',
                         category: cat,
                         severity: score > 8 ? 'high' : (score > 5 ? 'medium' : 'low'),
-                        reason: `Gasto inusual de $${val.toLocaleString('es-AR')} en '${cat}' (Mediana: $${median.toLocaleString('es-AR', { maximumFractionDigits: 0 })}). Score: ${score.toFixed(1)}`
+                        reason
                     });
                 }
             }
