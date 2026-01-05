@@ -171,7 +171,7 @@ export async function categorizeWithOpenAI(input: OpenAICategorizationInput): Pr
   // Prefer gpt-4o-mini for speed/cost/quality balance
   const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
-  const VALID_MODELS = ['gpt-3.5-turbo', 'gpt-4', 'gpt-4o', 'gpt-4o-mini'];
+  const VALID_MODELS = ['gpt-4o-mini', 'gpt-4o', 'gpt-4'];
   if (!VALID_MODELS.includes(model)) {
     console.warn(`Modelo ${model} no está en lista whitelist, pero intentaremos usarlo.`);
   }

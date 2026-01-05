@@ -10,7 +10,7 @@ function requireEnv(key: string): string {
 
 export const config = {
   OPENAI_API_KEY: requireEnv('OPENAI_API_KEY'),
-  OPENAI_MODEL: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
+  OPENAI_MODEL: process.env.OPENAI_MODEL || 'gpt-4o-mini',
   AI_MIN_CONFIDENCE: Number(process.env.AI_MIN_CONFIDENCE ?? 0.6),
   LOG_LEVEL: process.env.LOG_LEVEL || 'info',
   NODE_ENV: process.env.NODE_ENV || 'development',

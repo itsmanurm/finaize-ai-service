@@ -356,7 +356,6 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
 
 ENTIDADES A EXTRAER según el intent:
 - Para gastos/ingresos: amount, currency, merchant, category, description, year, month, day, account (ej: "Efectivo", "Banco", "Tarjeta"), paymentMethod ("efectivo", "debito", "credito")
-  IMPORTANTE para category: Si el usuario menciona un lugar específico (restaurante, supermercado, farmacia, etc.), usar ESE lugar como category, NO categorizar genéricamente. Ej: "gasté en restaurante" → category: "restaurante" (NO "alimentación")
 - Para presupuestos: category, month, year, amount
 - Para metas: amount, currency, description, category, deadline (fecha límite si se menciona), year, month
 - Para cuentas: name (IMPORTANTE: extraer el nombre específico del banco o institución mencionada, NO "nueva cuenta" ni palabras genéricas. Ej: "banco nacion", "Galicia", "BBVA", "Efectivo"), type ("cash", "bank", "card", "investment"), currency, primary, reconciled, archived
