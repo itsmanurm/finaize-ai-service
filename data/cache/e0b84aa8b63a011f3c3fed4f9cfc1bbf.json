@@ -1,0 +1,14 @@
+{
+  "data": {
+    "category": "Belleza",
+    "confidence": 0.95,
+    "reasons": [
+      "ai:La transacción se refiere a la compra de 'sombra para ojos', un producto de belleza, lo que justifica su clasificación en esta categoría."
+    ],
+    "merchant_clean": "Sombra Para Ojos",
+    "dedupHash": "770596e0f0623187798623fadc86d6fc235cf75a",
+    "aiEnhanced": true,
+    "aiReasoning": "La transacción se refiere a la compra de 'sombra para ojos', un producto de belleza, lo que justifica su clasificación en esta categoría."
+  },
+  "timestamp": 1767652412235
+}

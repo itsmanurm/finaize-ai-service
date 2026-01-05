@@ -1,0 +1,14 @@
+{
+  "data": {
+    "category": "Sin clasificar",
+    "confidence": 0.7,
+    "reasons": [
+      "ai:La descripción 'gasté 50 dolares' es ambigua y no especifica el tipo de gasto, lo que dificulta su clasificación precisa. No se puede determinar si se trata de alimentación, entretenimiento u otra categoría."
+    ],
+    "merchant_clean": "",
+    "dedupHash": "84d9ab1829e6965c23368f1e649f58d7f3e5ce69",
+    "aiEnhanced": true,
+    "aiReasoning": "La descripción 'gasté 50 dolares' es ambigua y no especifica el tipo de gasto, lo que dificulta su clasificación precisa. No se puede determinar si se trata de alimentación, entretenimiento u otra categoría."
+  },
+  "timestamp": 1767651747364
+}

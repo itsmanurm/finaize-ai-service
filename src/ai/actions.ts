@@ -94,8 +94,15 @@ export async function queryTopExpenses(payload: { year?: number; month?: number 
 import { appendJsonl } from '../utils/jsonl';
 import { categorize } from './enhanced-service';
 
-export async function actionAddExpense(payload: { amount: number; currency?: string; merchant?: string; description?: string; when?: string }, persist = true) {
-  const { amount, currency = 'ARS', merchant, description, when } = payload;
+export async function actionAddExpense(payload: { amount: number; currency?: string; merchant?: string; description?: string; when?: string; account?: string; paymentMethod?: string }, persist = true) {
+  const { amount, currency = 'ARS', merchant, description, when, paymentMethod } = payload;
+  
+  // Resolve account based on currency
+  let account = payload.account || 'Efectivo';
+  if (currency === 'USD' && account.toLowerCase() === 'efectivo') {
+    account = 'Efectivo USD';
+  }
+
   const categorized = await categorize({ description: description || '', merchant, amount, currency: currency as any });
 
   const record = {
@@ -105,6 +112,8 @@ export async function actionAddExpense(payload: { amount: number; currency?: str
     merchant: merchant || '',
     description: description || '',
     category: categorized.category,
+    account: account, 
+    paymentMethod: paymentMethod || 'efectivo',
     confidence: categorized.confidence,
     dedupHash: categorized.dedupHash
   };

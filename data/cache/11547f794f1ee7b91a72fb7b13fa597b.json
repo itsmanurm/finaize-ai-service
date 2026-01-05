@@ -1,0 +1,14 @@
+{
+  "data": {
+    "category": "Alimentación",
+    "confidence": 0.9,
+    "reasons": [
+      "ai:La descripción 'zanahorias' sugiere una compra relacionada con alimentos, lo que encaja en la categoría de Alimentación. Aunque el comercio no está especificado, el monto positivo indica que se trata de un ingreso relacionado con la venta de productos alimenticios."
+    ],
+    "merchant_clean": "",
+    "dedupHash": "3ebe3869ed2fa10737673e5b5c505559f4846936",
+    "aiEnhanced": true,
+    "aiReasoning": "La descripción 'zanahorias' sugiere una compra relacionada con alimentos, lo que encaja en la categoría de Alimentación. Aunque el comercio no está especificado, el monto positivo indica que se trata de un ingreso relacionado con la venta de productos alimenticios."
+  },
+  "timestamp": 1767652423358
+}
