@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { ensureSession, appendMessage } from '../ai/session';
 import { parseMessage } from '../ai/nlu';
-import { actionAddExpense, actionQuerySummary } from '../ai/actions';
+import { actionAddExpense, actionQuerySummary, actionQueryDollar } from '../ai/actions';
 
 const r = Router();
 
@@ -41,6 +41,7 @@ r.post('/chat', async (req, res) => {
       add_expense: actionAddExpense,
       query_summary: actionQuerySummary,
       query_top_expenses: actionQuerySummary,
+      query_dollar_rate: actionQueryDollar,
       create_goal: async () => ({ ok: true }),
       categorize: async () => ({ ok: true })
     };
@@ -90,6 +91,15 @@ r.post('/chat', async (req, res) => {
               reply = `Los mejores ${actionResult.activos[0].nombre.includes('Apple') ? 'CEDEARs' : 'activos'} ${actionResult.periodo} son: ` + actionResult.activos.map((a: any) => `${a.nombre} (${a.variacion}, $${a.precio})`).join(', ');
         } else {
           reply = 'No se encontraron activos destacados para tu consulta.';
+        }
+      } else if (nlu.intent === 'query_dollar_rate') {
+        if (actionResult.ok && actionResult.rates?.length) {
+          const ratesText = actionResult.rates.map((r: any) => 
+            `${r.nombre}: Compra $${r.compra?.toLocaleString('es-AR') || 'N/A'}, Venta $${r.venta?.toLocaleString('es-AR') || 'N/A'}`
+          ).join(' | ');
+          reply = `💵 Cotizaciones del dólar:\n${ratesText}`;
+        } else {
+          reply = 'No pude obtener las cotizaciones del dólar en este momento. Intentá de nuevo en unos minutos.';
         }
       }
     } else {

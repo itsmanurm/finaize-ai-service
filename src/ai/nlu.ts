@@ -80,6 +80,9 @@ const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
   
   // Análisis de perfil (alto peso)
   { name: 'analyze_financial_profile', re: /analizar.*perfil/i },
+  
+  // Consulta de dólar
+  { name: 'query_dollar_rate', re: /\b(d[oó]lar|cotizaci[oó]n|precio del d[oó]lar|blue|mep|ccl|contado con liquidaci[oó]n|tipo de cambio|cu[aá]nto est[aá] el d[oó]lar|valor del d[oó]lar|d[oó]lar hoy|d[oó]lar actual)\b/i },
 ];
 
 export async function parseMessage(message: string): Promise<NLUResult> {
@@ -337,6 +340,13 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
     }
   }
   // intent detection via rules
+
+  // Para intents de "acción directa" que no necesitan OpenAI, retornar inmediatamente
+  const DIRECT_ACTION_INTENTS = ['query_dollar_rate'];
+  if (matchedIntent && DIRECT_ACTION_INTENTS.includes(matchedIntent)) {
+    logNLU('info', `Direct action intent detected, skipping OpenAI: ${matchedIntent}`);
+    return { intent: matchedIntent, confidence: 0.95, entities: normalizeEntities(entities) };
+  }
 
   // Si no hay match, o la confianza es baja, usar OpenAI
   const apiKey = config.OPENAI_API_KEY;

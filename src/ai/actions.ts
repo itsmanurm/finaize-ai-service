@@ -37,6 +37,42 @@ export async function queryMarketInfo(payload: { activo?: string; period?: strin
   }
   return { ok: false, activos: [], periodo: payload.period, tipo: payload.tipo };
 }
+
+/**
+ * Acción: Consultar cotizaciones del dólar
+ * Llama al backend de Finaize que usa dolarapi.com
+ */
+export async function actionQueryDollar() {
+  try {
+    // URL del backend - usar variable de entorno o fallback
+    const backendUrl = process.env.FINAIZE_BACKEND_URL || 'http://localhost:3001';
+    const response = await fetch(`${backendUrl}/api/investments/market/exchange-rates`);
+    
+    if (!response.ok) {
+      console.error('[actionQueryDollar] Backend error:', response.status);
+      return { ok: false, error: 'Error al obtener cotizaciones', rates: [] };
+    }
+    
+    const rates = await response.json();
+    
+    // Formatear las cotizaciones para respuesta amigable
+    const formattedRates = rates.map((r: any) => ({
+      nombre: r.nombre || r.casa || r.moneda,
+      compra: r.compra,
+      venta: r.venta,
+      fechaActualizacion: r.fechaActualizacion
+    }));
+    
+    return { 
+      ok: true, 
+      rates: formattedRates,
+      timestamp: new Date().toISOString()
+    };
+  } catch (error: any) {
+    console.error('[actionQueryDollar] Error:', error.message);
+    return { ok: false, error: error.message, rates: [] };
+  }
+}
 // Helper de normalización reutilizable
 function normalize(str: string = '') {
   return String(str)
