@@ -1,0 +1,13 @@
+{
+  "data": {
+    "category": "Fintech",
+    "confidence": 0.95,
+    "reasons": [
+      "rule:uala"
+    ],
+    "merchant_clean": "Tarjeta",
+    "dedupHash": "5d92a7409949ae2fba7dc5bd3177ebfd4fc623d0",
+    "aiEnhanced": false
+  },
+  "timestamp": 1767739269831
+}

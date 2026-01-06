@@ -1,0 +1,14 @@
+{
+  "data": {
+    "category": "Alimentación",
+    "confidence": 0.85,
+    "reasons": [
+      "ai:La descripción 'papas' sugiere una compra relacionada con alimentos, aunque el comercio no está especificado. Se asume que es un gasto en alimentación."
+    ],
+    "merchant_clean": "",
+    "dedupHash": "3d2f55f7e22d11e112e64bf849c2f7185d51cce7",
+    "aiEnhanced": true,
+    "aiReasoning": "La descripción 'papas' sugiere una compra relacionada con alimentos, aunque el comercio no está especificado. Se asume que es un gasto en alimentación."
+  },
+  "timestamp": 1767739542456
+}
