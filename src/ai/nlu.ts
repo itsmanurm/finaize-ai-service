@@ -59,8 +59,8 @@ const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
   { name: 'query_summary', re: /\b(desde que|en los últimos|últimos \d+ (días|meses)).*gast/i },
   
   // Gastos/ingresos
-  { name: 'add_expense', re: /\b(gasté|gaste|pagué|pague|gasto|registrar gasto|agregar gasto|anotar gasto|transferí|transfer|deposité|pagué con)\b/i },
-  { name: 'add_income', re: /\b(gané|gane|cobré|cobre|recibí|me pagaron|ingreso|percibí|sueldo|salario)\b/i },
+  { name: 'add_expense', re: /\b(gasté|gaste|gastó|pagué|pague|pagó|compré|compre|compró|saqué|saque|sacó|retiré|retire|retiró|extraje|me cobraron|me cobró|me descontaron|salió|salieron|gasto|pago|compro|saco|retiro|registrar gasto|agregar gasto|anotar gasto)\b/i },
+  { name: 'add_income', re: /\b(gané|gane|ganó|cobré|cobre|cobró|recibí|recibe|recibió|me pagaron|me pagó|me ingresó|me ingresaron|me acreditaron|me acreditó|me depositaron|me depositó|ingreso|ingresos|percibí|percibe|percibió|sueldo|salario|cargué|cargue|cargó|cargar|deposité|deposite|depositó|depositar|transferí a mi|me transfirieron|me transferí)\b/i },
   
   // Presupuestos
   { name: 'create_budget', re: /\b(presupuesto|presupuesto de|gastar máximo|quiero gastar|asigno|asignar|límite de gasto)\b/i },
@@ -69,7 +69,7 @@ const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
   // Metas/objetivos
   { name: 'create_goal', re: /\b(meta|ahorrar|ahorro|guardar|objetivo|juntar|poner aparte para)\b/i },
   { name: 'create_goal', re: /\b(quiero juntar|quiero ahorrar|mi meta es|objetivo de)\b/i },
-  { name: 'add_contribution', re: /\b(ahorré|ahorre|guardé|guarde|puse|agregué|agregue|deposité|deposite)\b/i },
+  { name: 'add_contribution', re: /\b(ahorré|ahorre|ahorró|guardé|guarde|guardó|aparté|aparte|apartó|separé|separe|separó|puse aparte|puse|agregué|agregue|agregó|deposité|deposite|depositó|destiné|destine|destinó)\b.*\b(meta|ahorro|objetivo)\b/i },
   
   // Categorización
   { name: 'categorize', re: /\b(categoría|¿en qué categor|en qué entra|¿a qué categor)\b/i },
@@ -141,7 +141,7 @@ export async function parseMessage(message: string): Promise<NLUResult> {
       entities.month = relativeDate.date.getMonth() + 1;
       entities.year = relativeDate.date.getFullYear();
       entities._dateDescription = relativeDate.description;
-      logNLU('info', `Fecha relativa detectada: ${relativeDate.description}`);
+      logNLU('info', `Fecha relativa detectada: ${relativeDate.description} -> ${entities.day}/${entities.month}/${entities.year}`);
     }
   }
   
@@ -210,14 +210,14 @@ export async function parseMessage(message: string): Promise<NLUResult> {
   if (merchant) entities.merchant = merchant;
   if (category) entities.category = category;
   
-  // Año (solo si no es all_time)
-  if (!entities.all_time) {
+  // Año (solo si no es all_time y NO fue detectado por parseRelativeDate)
+  if (!entities.all_time && !entities.year) {
     const yearMatch = message.match(/(20\d{2})/);
     if (yearMatch) entities.year = Number(yearMatch[1]);
   }
   
-  // Mes (solo si no es all_time)
-  if (!entities.all_time) {
+  // Mes (solo si no es all_time y NO fue detectado por parseRelativeDate)
+  if (!entities.all_time && !entities.month) {
     const monthMatch = message.match(/enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre/i);
     if (monthMatch) {
       const months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -371,6 +371,17 @@ ENTIDADES A EXTRAER según el intent:
 - Para cuentas: name (IMPORTANTE: extraer el nombre específico del banco o institución mencionada, NO "nueva cuenta" ni palabras genéricas. Ej: "banco nacion", "Galicia", "BBVA", "Efectivo"), type ("cash", "bank", "card", "investment"), currency, primary, reconciled, archived
 - Para categorías: name, type ("income" o "expense"), icon, color, budgetLimit
 
+IMPORTANTE - Montos y formato argentino:
+- Extraer solo el número del monto, sin puntos ni comas
+- "1.000" o "1,000" → amount: 1000
+- "50.000" → amount: 50000
+- "2.5" o "2,5" → amount: 2.5 (para decimales)
+- "1k" → amount: 1000
+- Si no se especifica moneda explícitamente, asumir ARS (pesos argentinos) por defecto
+- Detectar moneda: "dólares", "USD", "verdes", "palos verdes" → USD
+- Detectar moneda: "pesos", "ARS", "$", "pe" → ARS
+- CONTEXTO ARGENTINO: "$" sin aclaración significa ARS, no USD
+
 IMPORTANTE - Referencias temporales:
 - Si el usuario pregunta "desde que abrí la cuenta", "desde que tengo cuenta", "desde el inicio": NO extraer year ni month. En su lugar, poner: all_time: true
 - Año actual: ${currentYear}
@@ -382,8 +393,11 @@ IMPORTANTE - Referencias temporales:
 - Si el usuario dice "este año", usar year: ${currentYear}
 - Si el usuario dice "el año que viene" o "próximo año", usar year: ${nextYear}
 - Si el usuario dice "este mes", usar month: ${currentMonth}, year: ${currentYear}
-- Si no se menciona mes, usar month: ${currentMonth}
-- Si no se menciona año, usar year: ${currentYear}
+- CRÍTICO - Para add_expense e add_income:
+  * Si el usuario usa tiempo pasado simple ("gasté", "pagué", "compré", "saqué", "retiré", "gané", "cobré", "cargué", "recibí", "me pagaron", "me acreditaron") SIN mencionar fecha explícita (ej: "ayer", "el lunes", "hace 3 días"), asumir que es HOY
+  * Si el usuario dice explícitamente "hoy", usar day: ${now.getDate()}, month: ${currentMonth}, year: ${currentYear}
+  * Si NO se menciona fecha específica en absoluto, usar day: ${now.getDate()}, month: ${currentMonth}, year: ${currentYear}
+  * SIEMPRE incluir day, month y year en entities para add_expense y add_income (no dejar ninguno vacío)
 - IMPORTANTE: Si all_time es true, NO incluir year ni month en entities
 
 IMPORTANTE - Método de pago:
@@ -393,10 +407,13 @@ IMPORTANTE - Método de pago:
 - Si no se especifica: paymentMethod: "efectivo" (default)
 
 IMPORTANTE - Cuenta:
-- Si menciona "banco", "cuenta bancaria", "transferencia": account: "Banco"
-- Si menciona "efectivo", "cash": account: "Efectivo"
+- Si menciona nombre específico de banco o fintech: usar ese nombre exacto (ej: "Ualá", "Mercado Pago", "Brubank", "Naranja X", "Galicia", "Santander", "BBVA", "Macro", "Nación")
+- Si menciona "banco", "cuenta bancaria" genérico: account: "Banco"
+- Si menciona "efectivo", "cash", "en mano": account: "Efectivo"
 - Si menciona "tarjeta" sin especificar: account: "Tarjeta"
+- Si menciona "billetera virtual", "wallet": extraer nombre específico (ej: "Mercado Pago", "Personal Pay")
 - Si no se especifica: account: "Efectivo" (default)
+- CONTEXTO ARGENTINO: "Ualá", "Mercado Pago", "Brubank", "Naranja X" son cuentas/tarjetas prepagas comunes
 
 IMPORTANTE - Nombre de cuenta (para create_account):
 - Extraer el nombre ESPECÍFICO del banco o institución mencionada
@@ -417,7 +434,7 @@ IMPORTANTE - Deadlines para metas:
 Reglas:
 - Si el usuario hace preguntas generales sobre cómo ahorrar, invertir, comprar activos, consejos financieros, educación financiera, SIN mencionar montos específicos, responde con intent "general_knowledge" y extrae topic (ej: ahorro, inversión, presupuesto, deudas, criptomonedas, etc).
 - Si el usuario pregunta por su perfil financiero, comportamiento de gastos, hábitos, salud financiera, análisis personal (ej: "¿cuál es mi perfil?", "¿cómo gasto?", "analiza mi comportamiento", "mi situación financiera"), responde con intent "analyze_financial_profile" y extrae timeframeMonths (número de meses a analizar, default: 6).
-- Si el usuario menciona INGRESOS, ganancias, cobros, salarios (ej: "gané", "cobré", "me pagaron", "recibí dinero"), responde con intent "add_income" y extrae amount, currency, source (fuente del ingreso), category, year, month, day, account, paymentMethod.
+- Si el usuario menciona INGRESOS, ganancias, cobros, salarios, carga de dinero a cuenta, acreditaciones, depósitos entrantes (ej: "gané", "cobré", "me pagaron", "recibí", "me acreditaron", "me depositaron", "me ingresaron", "me transfirieron", "cargué", "cargue", "cargar", "deposité en mi cuenta", "transferí a mi cuenta"), responde con intent "add_income" y extrae amount, currency, source (fuente del ingreso), category, year, month, day, account, paymentMethod. IMPORTANTE: Distinguir transferencias HACIA la cuenta del usuario (ingreso) de transferencias DESDE la cuenta (gasto).
 
 Mensaje: "¿Cuál es mi perfil financiero?"
 Respuesta: {"intent": "analyze_financial_profile", "confidence": 0.99, "entities": {}}
@@ -436,7 +453,7 @@ Respuesta: {"intent": "analyze_financial_profile", "confidence": 0.97, "entities
 - Si el usuario menciona crear una cuenta bancaria o billetera, responde con intent "create_account" y extrae name, type, currency, primary (falso por defecto), reconciled (falso por defecto), archived (falso por defecto).
 - Si el usuario menciona crear una categoría nueva, responde con intent "create_category" y extrae name, type ("income" o "expense"), icon, color, budgetLimit.
 - Si el usuario menciona invertir, comprar activos CON monto específico, responde con intent "invest" y extrae activo, amount, currency, periodo, tipo.
-- Si el usuario menciona gastos realizados, pagos, compras, transferencias, responde con intent "add_expense" y extrae amount, currency ('ARS' o 'USD'), merchant, category, description, year, month, day, account, paymentMethod (usar referencias temporales de arriba).
+- Si el usuario menciona GASTOS, pagos, compras, retiros, extracciones, transferencias a terceros (ej: "gasté", "pagué", "compré", "saqué plata", "retiré", "extraje", "me cobraron", "salió", "salieron", "compro", "pago", "transferí a [persona/comercio]"), responde con intent "add_expense" y extrae amount, currency ('ARS' o 'USD'), merchant, category, description, year, month, day, account, paymentMethod (usar referencias temporales de arriba). CONTEXTO ARGENTINO: "saqué" generalmente significa retiro de cajero o gasto, NO ingreso.
 - Si el usuario pregunta por resumen, balance, gastos con comparación entre períodos (ej: "en comparación al año pasado"), responde con intent "query_comparison" y extrae month, year, compare_year (año de comparación).
 - Si el usuario pregunta por resumen, balance, gastos altos, recurrentes SIN comparación, responde con intent "query_summary" o "query_top_expenses" según corresponda.
 - Si el usuario pregunta por categorización, responde con intent "categorize".
@@ -447,10 +464,130 @@ Mensaje: "En marzo quiero gastar solo 25000 en transporte"
 Respuesta: {"intent": "create_budget", "confidence": 0.99, "entities": {"category": "transporte", "month": 3, "year": ${currentYear}, "amount": 25000, "currency": "ARS"}}
 
 Mensaje: "Gaste 100 dolares en amazon"
-Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 100, "currency": "USD", "merchant": "amazon", "account": "Tarjeta"}}
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 100, "currency": "USD", "merchant": "amazon", "account": "Tarjeta", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
 
 Mensaje: "Pague 50 dolares en efectivo"
-Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 50, "currency": "USD", "account": "Efectivo", "paymentMethod": "efectivo"}}
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 50, "currency": "USD", "account": "Efectivo", "paymentMethod": "efectivo", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Hoy gasté 20000 en la peluquería"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 20000, "currency": "ARS", "merchant": "peluquería", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Gasté 5000 en el supermercado"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 5000, "currency": "ARS", "category": "supermercado", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Cargué 1000 en la Ualá"
+Respuesta: {"intent": "add_income", "confidence": 0.99, "entities": {"amount": 1000, "currency": "ARS", "account": "Ualá", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Me acreditaron 50000 de sueldo"
+Respuesta: {"intent": "add_income", "confidence": 0.99, "entities": {"amount": 50000, "currency": "ARS", "source": "sueldo", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Compré tornillos por 500"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 500, "currency": "ARS", "category": "Tornillos", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Saqué 5000 del cajero"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 5000, "currency": "ARS", "category": "Retiro", "paymentMethod": "efectivo", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Pagué 2000 con Mercado Pago"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 2000, "currency": "ARS", "account": "Mercado Pago", "paymentMethod": "debito", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Me transfirieron 15000 al Brubank"
+Respuesta: {"intent": "add_income", "confidence": 0.99, "entities": {"amount": 15000, "currency": "ARS", "account": "Brubank", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Cobré el sueldo 120000"
+Respuesta: {"intent": "add_income", "confidence": 0.99, "entities": {"amount": 120000, "currency": "ARS", "source": "sueldo", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Pagué la luz 8500"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 8500, "currency": "ARS", "category": "luz", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Fui al supermercado y gasté 2.300"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 2300, "currency": "ARS", "category": "supermercado", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Deposité 5000 dólares en el banco"
+Respuesta: {"intent": "add_income", "confidence": 0.99, "entities": {"amount": 5000, "currency": "USD", "account": "Banco", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Compré en la verduleria 1200"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 1200, "currency": "ARS", "category": "verduleria", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Pagué Netflix 4500"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 4500, "currency": "ARS", "category": "netflix", "merchant": "Netflix", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Transferí 10000 a mi hermana"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 10000, "currency": "ARS", "category": "transferencia", "description": "hermana", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Pagué el alquiler 180000"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 180000, "currency": "ARS", "category": "alquiler", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Fui al cine y gasté 3500"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 3500, "currency": "ARS", "category": "cine", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Pagué la tarjeta 45000"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 45000, "currency": "ARS", "account": "Tarjeta", "category": "pago de tarjeta", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Compré en la carnicería 7800"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 7800, "currency": "ARS", "category": "carniceria", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Pagué el gimnasio 15000"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 15000, "currency": "ARS", "category": "gimnasio", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Puse nafta 12000"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 12000, "currency": "ARS", "category": "nafta", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Pagué la prepaga 28000"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 28000, "currency": "ARS", "category": "prepaga", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Compré ropa 25000"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 25000, "currency": "ARS", "category": "ropa", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Pagué Spotify 1200"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 1200, "currency": "ARS", "category": "spotify", "merchant": "Spotify", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Pedí Rappi 8500"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 8500, "currency": "ARS", "category": "delivery", "merchant": "Rappi", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Tomé un Uber 3200"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 3200, "currency": "ARS", "category": "uber", "merchant": "Uber", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Cargué la SUBE 5000"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 5000, "currency": "ARS", "category": "sube", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Pagué el internet 9800"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 9800, "currency": "ARS", "category": "internet", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Compré en la farmacia 6400"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 6400, "currency": "ARS", "category": "farmacia", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Pagué las expensas 32000"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 32000, "currency": "ARS", "category": "expensa", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Fui al dentista 18000"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 18000, "currency": "ARS", "category": "dentista", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Compré libros 14500"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 14500, "currency": "ARS", "category": "libro", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Pagué el veterinario 9000"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 9000, "currency": "ARS", "category": "veterinario", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Pagué el celular 7500"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 7500, "currency": "ARS", "category": "celular", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Compré en la ferretería 3400"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 3400, "currency": "ARS", "category": "ferreteria", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Pagué el impuesto 22000"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 22000, "currency": "ARS", "category": "impuesto", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "Hice un curso 35000"
+Respuesta: {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 35000, "currency": "ARS", "category": "curso", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "¿Cuánto gasté este mes?"
+Respuesta: {"intent": "query_summary", "confidence": 0.99, "entities": {"month": ${currentMonth}, "year": ${currentYear}}}
+
+Mensaje: "¿Cuáles fueron mis mayores gastos?"
+Respuesta: {"intent": "query_top_expenses", "confidence": 0.99, "entities": {}}
+
+Mensaje: "Quiero ahorrar 100000 para vacaciones"
+Respuesta: {"intent": "create_goal", "confidence": 0.99, "entities": {"amount": 100000, "currency": "ARS", "description": "vacaciones"}}
 
 Mensaje: "Nueva cuenta de efectivo en dolares"
 Respuesta: {"intent": "create_account", "confidence": 0.99, "entities": {"name": "Efectivo USD", "type": "cash", "currency": "USD"}}
