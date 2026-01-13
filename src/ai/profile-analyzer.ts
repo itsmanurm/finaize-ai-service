@@ -25,6 +25,7 @@ export interface Goal {
   targetAmount: number;
   currentAmount: number;
   deadline?: string;
+  currency?: 'ARS' | 'USD';
 }
 
 export interface FinancialProfileInput {
