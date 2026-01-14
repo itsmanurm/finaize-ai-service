@@ -5,6 +5,7 @@ import { parseRelativeDate, getArgentinaDate } from '../utils/date-parser';
 // Definir un tipo más estricto para las entidades
 export type Entities = {
   category?: 'transferencia' | 'supermercado' | 'restaurante' | 'ahorro' | 'vacaciones' | 'recurrente' | 'otros' | string;
+  categories?: string[]; // For multi-category budgets
   amount?: number;
   merchant?: string;
   currency?: 'ARS' | 'USD' | 'EUR' | 'PESOS' | 'DOLARES' | 'EUROS' | string;
@@ -366,7 +367,7 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
 
 ENTIDADES A EXTRAER según el intent:
 - Para gastos/ingresos: amount, currency, merchant, category, description, year, month, day, account (ej: "Efectivo", "Banco", "Tarjeta"), paymentMethod ("efectivo", "debito", "credito")
-- Para presupuestos: category, month, year, amount, currency
+- Para presupuestos: category (o categories: ["A", "B"] si son varias), month, year, amount, currency
 - Para metas: amount, currency, description, category, deadline (fecha límite si se menciona), year, month
 - Para cuentas: name (IMPORTANTE: extraer el nombre específico del banco o institución mencionada, NO "nueva cuenta" ni palabras genéricas. Ej: "banco nacion", "Galicia", "BBVA", "Efectivo"), type ("cash", "bank", "card", "investment"), currency, primary, reconciled, archived
 - Para categorías: name, type ("income" o "expense"), icon, color, budgetLimit
