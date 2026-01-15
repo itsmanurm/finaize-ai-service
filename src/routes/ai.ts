@@ -240,39 +240,81 @@ r.post('/forecast', async (req, res) => {
       );
     }
 
-    // 2. Agrupar por día (sumar montos)
-    const dailyMap = new Map<string, number>();
+    // 2. Separar datos: Históricos (meses anteriores) vs Actuales (mes en curso)
+    const now = new Date();
+    const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Normalizar fechas y valores
+    // Map to { date: Date, value: number }
+    // Group by day first? Yes.
+
+    const historicalPointsMap = new Map<string, number>();
+    const currentPointsMap = new Map<string, number>();
 
     for (const t of filtered) {
-      // Soporte para date (Date) o when (string/Date)
       const d = t.date || t.when;
       if (!d) continue;
-
       const dateObj = typeof d === 'string' ? new Date(d) : d;
       if (isNaN(dateObj.getTime())) continue;
 
       const dateStr = dateObj.toISOString().split('T')[0];
-
-      // Convertimos a positivo absoluto
       const val = Math.abs(Number(t.amount) || 0);
-      dailyMap.set(dateStr, (dailyMap.get(dateStr) || 0) + val);
+
+      if (dateObj < startOfCurrentMonth) {
+        historicalPointsMap.set(dateStr, (historicalPointsMap.get(dateStr) || 0) + val);
+      } else {
+        currentPointsMap.set(dateStr, (currentPointsMap.get(dateStr) || 0) + val);
+      }
     }
 
-    const dataPoints = Array.from(dailyMap.entries()).map(([dateStr, value]) => ({
-      date: new Date(dateStr),
-      value
-    }));
+    const historicalData = Array.from(historicalPointsMap.entries()).map(([d, v]) => ({ date: new Date(d), value: v }));
+    const currentData = Array.from(currentPointsMap.entries()).map(([d, v]) => ({ date: new Date(d), value: v }));
 
     const { ForecastingService } = await import('../ai/forecasting');
 
-    const forecast = ForecastingService.predictLinear(dataPoints, horizonDays);
-    const movingAverage = ForecastingService.calculateMovingAverage(dataPoints, 7); // 7 day MA
+    // Usar lógica ADAPTATIVA
+    const totalDaysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const calendarDayOfMonth = now.getDate(); // 1...31
+
+    // Pass calendarDayOfMonth CORRECTLY
+    const forecast = ForecastingService.predictAdaptive(
+      historicalData,
+      currentData,
+      totalDaysInMonth,
+      calendarDayOfMonth
+    );
+
+    // El "historySmoothed" para el frontend será la data actual ordenada (Real Accumulate)
+    const currentSorted = [...currentData].sort((a, b) => a.date.getTime() - b.date.getTime());
+    const cumulativeReal: { date: Date, value: number }[] = [];
+    let sum = 0;
+    currentSorted.forEach(p => {
+      sum += p.value;
+      cumulativeReal.push({ date: p.date, value: sum });
+    });
+
+    // Active Spending Days calculation (days with data)
+    const activeSpendingDays = currentData.length;
+
+    // Quality Rule: < 7 days of actual month elapsed OR very few data points
+    let dataQuality = 'good';
+    if (calendarDayOfMonth < 7) dataQuality = 'limited';
+    else if ((currentData.length + historicalData.length) < 5) dataQuality = 'insufficient';
 
     return res.json({
       ok: true,
       category: category || 'all',
-      forecast,
-      historySmoothed: movingAverage
+      forecast: {
+        ...forecast,
+        predictions: forecast.predictions
+      },
+      historySmoothed: cumulativeReal,
+      meta: {
+        calendarDayOfMonth,
+        activeSpendingDays,
+        daysInMonth: totalDaysInMonth,
+        dataQuality
+      }
     });
 
   } catch (error: any) {
