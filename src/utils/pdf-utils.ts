@@ -1,25 +1,52 @@
 // src/utils/pdf-utils.ts
 import { Buffer } from 'buffer';
 
+// Importamos la función auxiliar para obtener pdfjsLib configurado
+import { getPdfjsLib } from './pdf-converter';
+
 /**
- * Extrae texto de un PDF usando pdf-parse
- * Útil para PDFs digitales (no escaneados)
+ * Extrae texto de un PDF usando pdfjs-dist directamente
+ * Elimina la necesidad de pdf-parse y unifica la lógica
  */
 export async function extractTextFromPdf(base64: string): Promise<string> {
   try {
-    console.log('[PDF Utils] Extracting text from PDF...');
+    console.log('[PDF Utils] Extracting text from PDF via pdfjs-dist...');
     
     const buffer = Buffer.from(base64, 'base64');
+    const uint8Array = new Uint8Array(buffer);
     
-    // Usar require para pdf-parse (mejor compatibilidad con tipos)
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require('pdf-parse');
-    const data = await pdfParse(buffer);
+    const pdfjsLib = await getPdfjsLib();
     
-    console.log('[PDF Utils] Text extracted, length:', data.text.length);
-    console.log('[PDF Utils] Pages found:', data.numpages);
+    // Configuración mínima para cargar el documento solo para texto
+    const loadingTask = pdfjsLib.getDocument({
+      data: uint8Array,
+      disableFontFace: true, // No necesitamos fuentes para extraer texto
+      useSystemFonts: false
+    });
+
+    const pdf = await loadingTask.promise;
+    console.log('[PDF Utils] Document loaded, pages:', pdf.numPages);
     
-    return data.text;
+    let fullText = '';
+    
+    // Extraer texto de todas las páginas (o límite seguro)
+    const maxPages = Math.min(pdf.numPages, 5);
+    
+    for (let i = 1; i <= maxPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        
+        // Unir items de texto con espacios
+        const pageText = textContent.items
+            .map((item: any) => item.str)
+            .join(' ');
+            
+        fullText += pageText + '\n\n';
+    }
+    
+    console.log('[PDF Utils] Text extracted, length:', fullText.length);
+    
+    return fullText;
   } catch (error: any) {
     console.error('[PDF Utils] Error extracting text:', error.message);
     return '';

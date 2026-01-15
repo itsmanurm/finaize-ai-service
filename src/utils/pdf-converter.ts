@@ -4,18 +4,33 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 
+// Polyfill para Node.js + Canvas + PDF.js
+// Esto es CRÍTICO para solucionar "Image or Canvas expected"
+// pdfjs-dist busca estas clases en el scope global al parsear imágenes
+if (typeof process !== 'undefined' && process.versions != null && process.versions.node != null) {
+  try {
+    const Canvas = require('canvas');
+    if (!(global as any).ImageData) { (global as any).ImageData = Canvas.ImageData; }
+    if (!(global as any).Image) { (global as any).Image = Canvas.Image; }
+    if (!(global as any).HTMLCanvasElement) { (global as any).HTMLCanvasElement = Canvas.Canvas; }
+    console.log('[PDF Converter] Global Canvas polyfills injected for pdfjs-dist');
+  } catch (e) {
+    console.warn('[PDF Converter] Could not inject Canvas globals:', e);
+  }
+}
+
 /**
  * Carga pdfjs-dist de forma dinámica (ESM desde CommonJS)
  * Usa canvas para renderizar las páginas del PDF
  */
-async function getPdfjsLib() {
+export async function getPdfjsLib() {
   try {
     // Cargar pdfjs-dist dinámicamente usando import()
     const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
     return pdfjsLib.default || pdfjsLib;
   } catch (err) {
     console.error('[PDF Converter] Error loading pdfjs-dist:', err);
-    throw new Error('pdfjs-dist ESM module failed to load. Fallback: return placeholder');
+    throw new Error('pdfjs-dist ESM module failed to load.');
   }
 }
 
@@ -74,11 +89,58 @@ export async function convertPdfPageToImage(
       throw new Error('Neither pdf2pic (Ghostscript) nor canvas module available. Please install Ghostscript or ensure canvas is installed.');
     }
 
-    const { createCanvas } = Canvas;
+    const { createCanvas, Image } = Canvas;
     const pdfjsLib = await getPdfjsLib();
     
+    // Configurar NodeCanvasFactory para pdfjs-dist
+    // Esto es necesario para evitar "Image or Canvas expected"
+    const canvasFactory = {
+      create: function (width: number, height: number) {
+        const canvas = createCanvas(width, height);
+        const context = canvas.getContext('2d');
+        return {
+          canvas: canvas,
+          context: context,
+        };
+      },
+      reset: function (canvasAndContext: any, width: number, height: number) {
+        canvasAndContext.canvas.width = width;
+        canvasAndContext.canvas.height = height;
+      },
+      destroy: function (canvasAndContext: any) {
+        canvasAndContext.canvas.width = 0;
+        canvasAndContext.canvas.height = 0;
+        canvasAndContext.canvas = null;
+        canvasAndContext.context = null;
+      },
+    };
+
+    let standardFontDataUrl: string | undefined;
+    try {
+      // Intentar configurar path a fuentes estándar
+      const fontDir = path.join(
+        path.dirname(require.resolve('pdfjs-dist/package.json')),
+        'standard_fonts'
+      );
+      // pdfjs-dist requiere trailing slash y preferiblemente forward slashes como "factory url"
+      const fontDirWin = fontDir.split(path.sep).join('/');
+      standardFontDataUrl = fontDirWin.endsWith('/') ? fontDirWin : fontDirWin + '/';
+      
+      console.log(`[PDF Converter] Standard fonts path (normalized): ${standardFontDataUrl}`);
+    } catch (fontError) {
+      console.warn('[PDF Converter] Could not resolve standard fonts path, proceeding without specific font config:', fontError);
+      // No lanzamos error, dejamos que pdfjs intente resolverlo o use fallback
+    }
+
     const uint8Array = new Uint8Array(buffer);
-    const pdf = await pdfjsLib.getDocument({ data: uint8Array }).promise;
+    
+    const loadingTask = pdfjsLib.getDocument({ 
+      data: uint8Array,
+      standardFontDataUrl, // Puede ser undefined
+      disableFontFace: true, 
+    });
+
+    const pdf = await loadingTask.promise;
     
     console.log(`[PDF Converter] PDF loaded, total pages: ${pdf.numPages}`);
 
@@ -94,10 +156,13 @@ export async function convertPdfPageToImage(
     const canvas = createCanvas(viewport.width, viewport.height);
     const context = canvas.getContext('2d');
 
-    const task = page.render({
+    const renderContext = {
       canvasContext: context,
-      viewport: viewport
-    } as any);
+      viewport: viewport,
+      canvasFactory: canvasFactory
+    } as any;
+
+    const task = page.render(renderContext);
     await task.promise;
 
     const imageBuffer = canvas.toBuffer('image/jpeg', { quality: 0.9 });

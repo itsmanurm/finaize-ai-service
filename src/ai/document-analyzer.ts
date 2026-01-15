@@ -177,9 +177,12 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
 
   // ===== 3. MONTO (mejorado para formatos argentinos) =====
   const montoPatterns = [
-    // Mercado Pago style: $ 1.234,56 or $1.234,56
+    // Mercado Pago style: $ 1.234,56
     /\$\s*([\d.]+,\d{2})/i,
-    /\$\s*([\d,]+(?:\.\d{2})?)/i,
+    // $ 1.234 (miles con punto, sin decimales - común en UX moderna)
+    /\$\s*(\d{1,3}(?:\.\d{3})+)(?!\d|,)/i,
+    // $ 1234,56 (sin punto miles)
+    /\$\s*(\d+,\d{2})/i,
     // Explicit labels
     /monto[:\s]+([\d.,]+)/i,
     /total[:\s]+([\d.,]+)/i,
@@ -190,26 +193,31 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
     /(?:ars|pesos?)\s*([\d.,]+)/i,
     // Big numbers with dots as thousand separator: 1.234.567,89
     /([\d]{1,3}(?:\.[\d]{3})*,[\d]{2})/,
-    // US format as fallback: 1,234.56
-    /([\d]{1,3}(?:,[\d]{3})*\.[\d]{2})/,
   ];
 
   for (const pattern of montoPatterns) {
     const match = clean.match(pattern);
     if (match?.[1]) {
       let raw = match[1];
+      console.log(`[Heuristics] Raw monto match: "${raw}" using pattern ${pattern}`);
+
       const parts = raw.split(/[.,]/);
-      if (parts.length > 2) {
-        raw = parts.slice(0, -1).join('') + '.' + parts[parts.length - 1];
-      } else {
-        raw = raw.replace(/\./g, '').replace(',', '.');
+      // Caso 1.234.567,89 -> parts > 2 o contiene ','
+      if (raw.includes(',')) {
+         // Formato AR estándar: eliminar puntos, cambiar coma por punto
+         raw = raw.replace(/\./g, '').replace(',', '.');
+      } else if (raw.includes('.')) {
+         // Caso 1.234 (solo puntos de miles) -> eliminar puntos
+         // PRECAUCIÓN: Si es 1.23 (US format), esto lo convierte en 123.
+         // Asumimos AR context: puntos son miles si hay más de uno o si siguen patrón xxx.xxx
+         raw = raw.replace(/\./g, '');
       }
 
       const parsed = Number(raw);
       if (!Number.isNaN(parsed) && parsed > 0 && parsed < 100000000) {
         detectedFields.monto = parsed;
         confidence = Math.max(confidence, 0.75);
-        console.log('[Heuristics] Found monto:', parsed);
+        console.log('[Heuristics] Parsed monto:', parsed);
         break;
       }
     }
@@ -238,8 +246,28 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
       if (Number(year) < 100) {
         year = String(2000 + Number(year));
       }
+      
+      // Mapeo de meses texto a número si es necesario
+      const monthsEs:Record<string, string> = {
+          'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04', 'mayo': '05', 'junio': '06',
+          'julio': '07', 'agosto': '08', 'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12',
+          'ene': '01', 'feb': '02', 'mar': '03', 'abr': '04', 'may': '05', 'jun': '06',
+          'jul': '07', 'ago': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dic': '12'
+      };
+      
+      if (isNaN(Number(month))) {
+          const lowerMonth = month.toLowerCase();
+          if (monthsEs[lowerMonth]) {
+              month = monthsEs[lowerMonth];
+          }
+      }
 
-      detectedFields.fecha = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      // IMPORTANTE: Fijar hora a mediodía (12:00) para evitar problemas de Timezone
+      // Si devolvemos YYYY-MM-DD, el constructor Date() asume UTC 00:00, que en GMT-3 es el día anterior.
+      // Devolvemos formato ISO completo.
+      const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T12:00:00.000Z`;
+      
+      detectedFields.fecha = isoDate;
       confidence = Math.max(confidence, 0.75);
       console.log('[Heuristics] Found fecha:', detectedFields.fecha);
       break;

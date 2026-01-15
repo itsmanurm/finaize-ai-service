@@ -26,64 +26,114 @@ r.post('/analyze', async (req, res) => {
 
     let result;
 
-    // === CASO 1: PDF => ANÁLISIS HÍBRIDO (texto + visión) ===
+    // === CASO 1: PDF => ANÁLISIS HÍBRIDO (Texto + Visión) ===
     if (fileType === 'application/pdf' && file) {
-      console.log(`[Documents API] Processing PDF with hybrid analysis: ${fileName}`);
+      console.log(`[Documents API] ========== PDF ANALYSIS START ==========`);
+      console.log(`[Documents API] Processing PDF: ${fileName}`);
+      console.log(`[Documents API] Original file length: ${file.length}`);
 
-      // Import PDF utilities
-      const { extractTextFromPdf, isPdfScanned, cleanPdfText } = await import('../utils/pdf-utils');
-      
-      // 1. Intentar extraer texto del PDF
-      let extractedText = '';
-      try {
-        extractedText = await extractTextFromPdf(file);
-        extractedText = cleanPdfText(extractedText);
-        console.log('[Documents API] PDF text extracted, length:', extractedText.length);
-      } catch (textError: any) {
-        console.warn('[Documents API] Text extraction failed:', textError.message);
+      // Variables para la estrategia
+      let imageBase64: string | null = null;
+      let textExtractionFailed = false;
+
+      // 1. Limpieza y Validación
+      // Limpiar prefijo data URI si existe
+      const base64Clean = file.replace(/^data:application\/pdf;base64,/, '');
+      console.log(`[Documents API] Clean base64 length: ${base64Clean.length}`);
+
+      // Verificar MAGIC BYTES de PDF (%PDF)
+      const bufferCheck = Buffer.from(base64Clean, 'base64');
+      const header = bufferCheck.subarray(0, 5).toString('ascii');
+      const hexHeader = bufferCheck.subarray(0, 5).toString('hex');
+      console.log(`[Documents API] PDF Header Check: "${header}" (Hex: ${hexHeader})`);
+
+      if (!header.startsWith('%PDF-')) {
+        console.error(`[Documents API] CRITICAL: Invalid PDF header. Expected '%PDF-', got '${header}'`);
       }
 
-      // 2. Determinar estrategia basada en el texto extraído
-      const hasGoodText = extractedText.length > 200;
-      const isScanned = isPdfScanned(extractedText, 1);
+      // 2. Intentar extracción de texto (Estrategia PRIMARIA)
+      try {
+        console.log('[Documents API] Strategy: Trying text extraction first...');
+        const { extractTextFromPdf, cleanPdfText } = await import('../utils/pdf-utils');
+        let extractedText = '';
 
-      if (hasGoodText && !isScanned) {
-        // PDF digital con buen texto: usar análisis de texto primero
-        console.log('[Documents API] Using text-first strategy for digital PDF');
-        result = await analyzeDocumentText(extractedText, fileName);
-        
-        // Si la confianza es baja, complementar con Vision
-        if (result.confidenceScores.global < 0.7) {
-          console.log('[Documents API] Low confidence, supplementing with Vision');
-          const imageBase64 = await convertPdfPageToImage(file, 1);
-          const visionResult = await analyzeDocument(imageBase64, fileName, 'image/jpeg');
-          
-          // Merge results, prefer vision for missing fields
-          if (visionResult.confidenceScores.global > result.confidenceScores.global) {
-            result = visionResult;
-            result.reasoning = 'Hybrid: Vision preferred (higher confidence)';
+        try {
+          extractedText = cleanPdfText(await extractTextFromPdf(base64Clean));
+          console.log(`[Documents API] Text extraction success: ${extractedText.length} chars`);
+        } catch (e: any) {
+          console.warn(`[Documents API] Text extraction failed: ${e.message}`);
+          textExtractionFailed = true;
+        }
+
+        // Si hay texto suficiente (>50 chars), analizamos el texto
+        if (!textExtractionFailed && extractedText.length > 50) {
+          console.log('[Documents API] Analyzing extracted text directly...');
+          result = await analyzeDocumentText(extractedText, fileName);
+
+          // Evaluar confianza
+          if (result.confidenceScores.global > 0.8) {
+            result.reasoning = 'Analyzed via text extraction (High Confidence)';
+            console.log('[Documents API] Text analysis sufficient. Skipping Vision.');
           } else {
-            // Complementar campos faltantes
-            if (!result.detectedFields.monto && visionResult.detectedFields.monto) {
-              result.detectedFields.monto = visionResult.detectedFields.monto;
-            }
-            if (!result.detectedFields.fecha && visionResult.detectedFields.fecha) {
-              result.detectedFields.fecha = visionResult.detectedFields.fecha;
-            }
-            result.reasoning = 'Hybrid: Text + Vision merged';
+            console.log('[Documents API] Text confidence low, proceeding to Vision fallback...');
+            // Marcar para usar visión aunque tengamos texto resultado (para posible merge)
+            // Pero primero necesitamos convertir a imagen
           }
         } else {
-          result.reasoning = 'PDF text analysis (high confidence)';
+          console.log('[Documents API] Not enough usable text. Proceeding to Vision...');
         }
-      } else {
-        // PDF escaneado o poco texto: usar Vision directamente
-        console.log('[Documents API] Using Vision for scanned/image PDF');
-        const imageBase64 = await convertPdfPageToImage(file, 1);
-        console.log('[Documents API] PDF converted to image, length:', imageBase64.length);
-        
-        result = await analyzeDocument(imageBase64, fileName, 'image/jpeg');
-        result.reasoning = (result.reasoning || '') + ' | Scanned PDF analyzed as image';
+      } catch (err: any) {
+        console.error('[Documents API] Error in text extraction phase:', err);
       }
+
+      // 3. Estrategia de Visión (FALLBACK o COMPLEMENTO)
+      // Si no tenemos resultado aún O la confianza es baja, intentamos visión
+      if (!result || result.confidenceScores.global <= 0.8) {
+        try {
+          console.log('[Documents API] Converting PDF to image for Vision...');
+          const imageBase64 = await convertPdfPageToImage(base64Clean, 1);
+
+          if (!imageBase64 || imageBase64.length < 1000) {
+            throw new Error('PDF conversion returned empty or too small image');
+          }
+
+          console.log(`[Documents API] PDF converted successfully (${imageBase64.length} chars). Sending to Vision...`);
+          const visionResult = await analyzeDocument(imageBase64, fileName, 'image/jpeg');
+
+          if (result) {
+            // MERGE: Si ya teníamos un resultado de texto (baja confianza), comparamos
+            if (visionResult.confidenceScores.global > result.confidenceScores.global) {
+              result = visionResult;
+              result.reasoning = 'Hybrid: Vision preferred (Higher Confidence)';
+            } else {
+              result.reasoning = 'Hybrid: Text preferred (despite low confidence)';
+            }
+          } else {
+            // Si no había resultado de texto, usamos Vision directo
+            result = visionResult;
+            result.reasoning = 'Analyzed via Vision (PDF image)';
+          }
+
+          console.log('[Documents API] Vision analysis complete.');
+
+        } catch (visionError: any) {
+          console.error('[Documents API] Vision strategy failed:', visionError.message);
+          
+          if (!result) {
+             // Si falló visión Y no teníamos resultado de texto, devolvemos error controlado
+             console.error('[Documents API] Both text and vision strategies failed.');
+             result = {
+               detectedDocType: 'otro',
+               direction: 'indeterminado',
+               detectedFields: {},
+               confidenceScores: { global: 0 },
+               suggestedEntityType: 'transaction',
+               reasoning: `PDF analysis failed. Text extraction failed. Image conversion failed: ${visionError.message}`
+             } as any;
+          }
+        }
+      }
+      console.log(`[Documents API] ========== PDF ANALYSIS SUCCESS ==========`);
     }
 
     // === CASO 2: Texto plano ya extraído (para futuros OCR) ===
