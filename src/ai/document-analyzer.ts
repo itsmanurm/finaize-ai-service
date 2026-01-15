@@ -89,22 +89,51 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
   const detectedFields: DetectedFields = {};
   let confidence = 0.3;
 
-  // ===== 1. TIPO DE DOCUMENTO =====
-  if (
-    lower.includes('transferencia') ||
-    lower.includes('transferiste') ||
-    lower.includes('transferido') ||
-    lower.includes('transference')
-  ) {
+  // ===== 1. TIPO DE DOCUMENTO (mejorado para Argentina) =====
+  
+  // Mercado Pago patterns
+  const isMercadoPago = lower.includes('mercado pago') || lower.includes('mercadopago') || 
+                        lower.includes('le pagaste a') || lower.includes('te pagó') ||
+                        lower.includes('dinero disponible') || lower.includes('cvu');
+  
+  // Personal Pay patterns
+  const isPersonalPay = lower.includes('personal pay') || lower.includes('personalpay') ||
+                        lower.includes('te enviaron dinero') || lower.includes('enviaste dinero');
+  
+  // Transfer patterns (expanded con Personal Pay y más variantes)
+  const isTransfer = lower.includes('transferencia') || lower.includes('transferiste') ||
+                     lower.includes('transferido') || lower.includes('transference') ||
+                     lower.includes('le pagaste a') || lower.includes('te pagó') ||
+                     lower.includes('enviaste') || lower.includes('recibiste') ||
+                     lower.includes('te enviaron dinero') || lower.includes('enviaste dinero') ||
+                     lower.includes('cbu') || lower.includes('alias') ||
+                     lower.includes('n° de operación') || lower.includes('coelsa');
+  
+  // Invoice/Bill patterns (facturas de servicios argentinos)
+  const isFactura = lower.includes('factura') || lower.includes('invoice') ||
+                    lower.includes('período') || lower.includes('vencimiento') ||
+                    lower.includes('edenor') || lower.includes('edesur') ||
+                    lower.includes('metrogas') || lower.includes('aysa') ||
+                    lower.includes('telecom') || lower.includes('personal') ||
+                    lower.includes('movistar') || lower.includes('claro') ||
+                    lower.includes('cuit') || lower.includes('número de cliente');
+  
+  // Receipt patterns
+  const isRecibo = lower.includes('recibo') || lower.includes('comprobante de pago') ||
+                   lower.includes('ticket') || lower.includes('constancia');
+  
+  // Card statement patterns
+  const isResumenTarjeta = (lower.includes('resumen') && (lower.includes('tarjeta') || lower.includes('credit'))) ||
+                           lower.includes('visa') || lower.includes('mastercard') ||
+                           lower.includes('american express') || lower.includes('consumos del período');
+  
+  if (isTransfer || isMercadoPago || isPersonalPay) {
     detectedDocType = DocumentType.TRANSFERENCIA;
-  } else if (lower.includes('factura')) {
+  } else if (isFactura) {
     detectedDocType = DocumentType.FACTURA;
-  } else if (lower.includes('recibo') || lower.includes('comprobante de pago')) {
+  } else if (isRecibo) {
     detectedDocType = DocumentType.RECIBO;
-  } else if (
-    lower.includes('resumen') &&
-    (lower.includes('tarjeta') || lower.includes('credit'))
-  ) {
+  } else if (isResumenTarjeta) {
     detectedDocType = DocumentType.RESUMEN_TARJETA;
   } else if (lower.includes('ingreso') || lower.includes('depositado')) {
     detectedDocType = DocumentType.INGRESO;
@@ -112,7 +141,7 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
     detectedDocType = DocumentType.EGRESO;
   }
 
-  // ===== 2. DIRECCIÓN =====
+  // ===== 2. DIRECCIÓN (mejorado para Personal Pay) =====
   if (
     lower.includes('recibiste') ||
     lower.includes('te acreditamos') ||
@@ -123,7 +152,9 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
     lower.includes('acreditado') ||
     lower.includes('crédito') ||
     lower.includes('entrada') ||
-    lower.includes('recibida')
+    lower.includes('recibida') ||
+    lower.includes('te enviaron dinero') ||
+    lower.includes('te pagó')
   ) {
     direction = TransferDirection.ENTRADA;
   } else if (
@@ -144,14 +175,23 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
     direction = TransferDirection.INTERNA;
   }
 
-  // ===== 3. MONTO =====
+  // ===== 3. MONTO (mejorado para formatos argentinos) =====
   const montoPatterns = [
-    /monto[:\s]+([\d\.\,]+)/i,
-    /total[:\s]+([\d\.\,]+)/i,
-    /importe[:\s]+([\d\.\,]+)/i,
-    /cantidad[:\s]+([\d\.\,]+)/i,
-    /(?:ars|\$)\s+([\d\.\,]+(?:[\.,]\d{2})?)/i,
-    /(?:ars|\$)\s*([\d\.\,]+(?:[\.,]\d{2})?)\s*(?:ars|pesos)?/i,
+    // Mercado Pago style: $ 1.234,56 or $1.234,56
+    /\$\s*([\d.]+,\d{2})/i,
+    /\$\s*([\d,]+(?:\.\d{2})?)/i,
+    // Explicit labels
+    /monto[:\s]+([\d.,]+)/i,
+    /total[:\s]+([\d.,]+)/i,
+    /importe[:\s]+([\d.,]+)/i,
+    /saldo[:\s]+([\d.,]+)/i,
+    /pago[:\s]+([\d.,]+)/i,
+    // Currency prefix
+    /(?:ars|pesos?)\s*([\d.,]+)/i,
+    // Big numbers with dots as thousand separator: 1.234.567,89
+    /([\d]{1,3}(?:\.[\d]{3})*,[\d]{2})/,
+    // US format as fallback: 1,234.56
+    /([\d]{1,3}(?:,[\d]{3})*\.[\d]{2})/,
   ];
 
   for (const pattern of montoPatterns) {
@@ -306,79 +346,60 @@ export async function analyzeDocument(
     // Remover prefijo data:image si existe
     const cleanBase64 = base64Image.replace(/^data:image\/[a-z]+;base64,/, '');
 
-  const prompt = `Sos un experto analizando documentos financieros argentinos. Analiza esta imagen y extrae la información relevante.
+  const prompt = `Sos un experto analizando documentos financieros ARGENTINOS. Analiza esta imagen con mucho cuidado y extrae TODA la información relevante.
 
-El documento puede ser:
-- Factura (servicios, compras, etc)
-- Recibo (comprobante de pago)
-- Transferencia bancaria (captura de app bancaria o home banking)
-- Comprobante de ingreso
-- Comprobante de egreso
-- Resumen de tarjeta de crédito
-- Otro tipo de documento financiero
+APPS Y BANCOS COMUNES EN ARGENTINA:
+- Mercado Pago: "Le pagaste a", "Te pagó", CVU, "Dinero disponible"
+- Personal Pay: "Te enviaron dinero", "Enviaste dinero", Coelsa ID
+- Brubank, Ualá, Naranja X: Transferencia inmediata, CBU
+- Bancos tradicionales: Santander, Galicia, BBVA, Macro, HSBC, Nación, etc.
 
-IMPORTANTE para TRANSFERENCIAS:
-- Si el documento dice "transferiste", "enviaste", "pagaste", "transferencia enviada", "débito", o similar: direction = "salida" (el usuario ENVIÓ dinero)
-- Si dice "recibiste", "te depositaron", "ingreso", "acreditación", "crédito", o similar: direction = "entrada" (el usuario RECIBIÓ dinero)
-- Si menciona "entre tus cuentas", "transferencia interna": direction = "interna"
-- Si no está claro: direction = "indeterminado"
+EMPRESAS DE SERVICIOS COMUNES:
+- Luz: Edenor, Edesur, EPEC, EPE
+- Gas: Metrogas, Camuzzi, Litoral Gas
+- Agua: AySA, ABSA
+- Internet/TV: Telecom, Personal, Movistar, Claro, Fibertel
+- Impuestos: AFIP, ARBA, AGIP
 
-Extrae TODO lo que puedas:
-- fecha (formato YYYY-MM-DD si es posible, sino el texto original)
-- monto (solo el número, sin símbolo de moneda)
-- moneda (ARS, USD, etc)
-- origen (de dónde viene el dinero: nombre, alias, CBU)
-- destino (a dónde va: nombre, alias, CBU)
-- aliasCbu (alias o CBU si aparece)
-- categoria (sugiere una categoría apropiada: Servicios, Alimentación, Transporte, Transferencias, Salud, etc)
-- numeroFactura
-- periodo (ej: "Enero 2025" si es factura de servicio)
-- vencimiento (fecha de vencimiento)
-- empresa (nombre de la empresa emisora)
-- concepto (descripción del movimiento)
-- referencia (número de operación/referencia)
-- nombreContraparte (nombre de la otra persona/empresa involucrada)
-- cuenta (número de cuenta si aparece)
-- metodoPago (efectivo, débito, crédito, transferencia)
-- impuestos (monto de impuestos si aplica)
+TIPOS DE DOCUMENTOS:
+1. Captura de app (transferencia): Mira si dice "transferiste"/"pagaste" (SALIDA) o "recibiste"/"te pagaron" (ENTRADA)
+2. Factura de servicio: Busca período, vencimiento, número de cliente, CUIT
+3. Ticket/recibo impreso: Busca total, fecha, comercio
+4. Resumen de tarjeta: Visa, Mastercard, consumos del período
 
-También asigna:
-- suggestedEntityType: qué tipo de registro crear en el sistema (transaction, bill, income, expense, adjustment)
-- confidenceScores: un objeto con el score global (0-1) y scores por campo
+IMPORTANTE - DIRECCIÓN DE TRANSFERENCIAS:
+- "transferiste", "enviaste", "pagaste", "débito", "Le pagaste a" → direction = "salida"
+- "recibiste", "te pagaron", "acreditación", "crédito", "Te pagó" → direction = "entrada"
+- "entre tus cuentas" → direction = "interna"
+- No está claro → direction = "indeterminado"
 
-RESPONDE SOLO CON ESTE FORMATO JSON EXACTO (sin markdown, sin explicaciones adicionales):
+EXTRAE TODO LO POSIBLE:
+- fecha: formato YYYY-MM-DD (busca en todo el documento)
+- monto: solo el número, SIN $ ni puntos de miles (ej: 15000.50)
+- moneda: ARS o USD
+- nombreContraparte: persona o empresa involucrada
+- categoria: Servicios, Alimentación, Transporte, Transferencias, Salud, Entretenimiento, etc.
+- empresa: nombre de la empresa emisora
+- concepto: descripción corta del movimiento
+- numeroFactura: si es factura
+- vencimiento: fecha de vencimiento si aplica
+- metodoPago: transferencia, débito, crédito, efectivo
+
+FORMATO DE RESPUESTA (JSON puro, sin markdown):
 {
   "detectedDocType": "transferencia|factura|recibo|ingreso|egreso|resumen_tarjeta|comprobante|otro",
   "direction": "entrada|salida|interna|indeterminado",
-  "detectedFields": { ... },
-  "confidenceScores": { "global": 0.92, ... },
-  "suggestedEntityType": "transaction|bill|income|expense|adjustment"
-}
-{
-  "detectedDocType": "transferencia",
-  "direction": "salida",
   "detectedFields": {
-    "fecha": "2025-12-10",
-    "monto": 15000,
+    "fecha": "2025-01-15",
+    "monto": 15000.50,
     "moneda": "ARS",
-    "origen": "Juan Pérez",
-    "destino": "María García",
-    "aliasCbu": "maria.garcia.mp",
-    "categoria": "Transferencias",
-    "concepto": "Pago compartido",
-    "referencia": "123456789",
-    "nombreContraparte": "María García",
-    "metodoPago": "transferencia"
+    "nombreContraparte": "Nombre",
+    "categoria": "Servicios",
+    "concepto": "Descripción"
   },
-  "confidenceScores": {
-    "global": 0.92,
-    "fecha": 0.95,
-    "monto": 0.98,
-    "origen": 0.85,
-    "destino": 0.90
-  },
+  "confidenceScores": { "global": 0.85 },
   "suggestedEntityType": "transaction",
-  "reasoning": "Es una transferencia bancaria enviada por el usuario, con todos los datos claros"
+  "reasoning": "Breve explicación"
 }`;
 
     console.log('[Document Analyzer] Analyzing document:', fileName);

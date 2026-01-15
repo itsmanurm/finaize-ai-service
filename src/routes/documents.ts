@@ -26,15 +26,64 @@ r.post('/analyze', async (req, res) => {
 
     let result;
 
-    // === CASO 1: PDF => SIEMPRE IMAGEN + VISION ===
+    // === CASO 1: PDF => ANÁLISIS HÍBRIDO (texto + visión) ===
     if (fileType === 'application/pdf' && file) {
-      console.log(`[Documents API] Processing PDF with Vision only: ${fileName}`);
+      console.log(`[Documents API] Processing PDF with hybrid analysis: ${fileName}`);
 
-      const imageBase64 = await convertPdfPageToImage(file, 1);
-      console.log('[Documents API] PDF converted to image, length:', imageBase64.length);
+      // Import PDF utilities
+      const { extractTextFromPdf, isPdfScanned, cleanPdfText } = await import('../utils/pdf-utils');
+      
+      // 1. Intentar extraer texto del PDF
+      let extractedText = '';
+      try {
+        extractedText = await extractTextFromPdf(file);
+        extractedText = cleanPdfText(extractedText);
+        console.log('[Documents API] PDF text extracted, length:', extractedText.length);
+      } catch (textError: any) {
+        console.warn('[Documents API] Text extraction failed:', textError.message);
+      }
 
-      result = await analyzeDocument(imageBase64, fileName, 'image/jpeg');
-      result.reasoning = (result.reasoning || '') + ' | PDF analyzed as image (first page)';
+      // 2. Determinar estrategia basada en el texto extraído
+      const hasGoodText = extractedText.length > 200;
+      const isScanned = isPdfScanned(extractedText, 1);
+
+      if (hasGoodText && !isScanned) {
+        // PDF digital con buen texto: usar análisis de texto primero
+        console.log('[Documents API] Using text-first strategy for digital PDF');
+        result = await analyzeDocumentText(extractedText, fileName);
+        
+        // Si la confianza es baja, complementar con Vision
+        if (result.confidenceScores.global < 0.7) {
+          console.log('[Documents API] Low confidence, supplementing with Vision');
+          const imageBase64 = await convertPdfPageToImage(file, 1);
+          const visionResult = await analyzeDocument(imageBase64, fileName, 'image/jpeg');
+          
+          // Merge results, prefer vision for missing fields
+          if (visionResult.confidenceScores.global > result.confidenceScores.global) {
+            result = visionResult;
+            result.reasoning = 'Hybrid: Vision preferred (higher confidence)';
+          } else {
+            // Complementar campos faltantes
+            if (!result.detectedFields.monto && visionResult.detectedFields.monto) {
+              result.detectedFields.monto = visionResult.detectedFields.monto;
+            }
+            if (!result.detectedFields.fecha && visionResult.detectedFields.fecha) {
+              result.detectedFields.fecha = visionResult.detectedFields.fecha;
+            }
+            result.reasoning = 'Hybrid: Text + Vision merged';
+          }
+        } else {
+          result.reasoning = 'PDF text analysis (high confidence)';
+        }
+      } else {
+        // PDF escaneado o poco texto: usar Vision directamente
+        console.log('[Documents API] Using Vision for scanned/image PDF');
+        const imageBase64 = await convertPdfPageToImage(file, 1);
+        console.log('[Documents API] PDF converted to image, length:', imageBase64.length);
+        
+        result = await analyzeDocument(imageBase64, fileName, 'image/jpeg');
+        result.reasoning = (result.reasoning || '') + ' | Scanned PDF analyzed as image';
+      }
     }
 
     // === CASO 2: Texto plano ya extraído (para futuros OCR) ===

@@ -89,7 +89,7 @@ export async function convertPdfPageToImage(
     }
 
     const page = await pdf.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 2 });
+    const viewport = page.getViewport({ scale: 3 }); // Alta resolución para mejor OCR
     
     const canvas = createCanvas(viewport.width, viewport.height);
     const context = canvas.getContext('2d');
