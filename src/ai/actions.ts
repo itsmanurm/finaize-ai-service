@@ -129,6 +129,7 @@ export async function queryTopExpenses(payload: { year?: number; month?: number 
 }
 import { appendJsonl } from '../utils/jsonl';
 import { categorize } from './enhanced-service';
+import { getArgentinaDate } from '../utils/date-parser';
 
 export async function actionAddExpense(payload: { amount: number; currency?: string; merchant?: string; description?: string; when?: string; account?: string; paymentMethod?: string }, persist = true) {
   const { amount, currency = 'ARS', merchant, description, when, paymentMethod } = payload;
@@ -141,8 +142,27 @@ export async function actionAddExpense(payload: { amount: number; currency?: str
 
   const categorized = await categorize({ description: description || '', merchant, amount, currency: currency as any });
 
+  // Si se proporciona 'when', parsear esa fecha; si no, usar fecha actual de Argentina
+  let timestamp: string;
+  if (when) {
+    // Si 'when' ya es una fecha válida ISO, usarla; si no, parsearla
+    try {
+      const whenDate = new Date(when);
+      if (!isNaN(whenDate.getTime())) {
+        timestamp = whenDate.toISOString();
+      } else {
+        timestamp = getArgentinaDate().toISOString();
+      }
+    } catch {
+      timestamp = getArgentinaDate().toISOString();
+    }
+  } else {
+    // Sin fecha especificada: usar fecha actual de Argentina
+    timestamp = getArgentinaDate().toISOString();
+  }
+
   const record = {
-    ts: new Date().toISOString(),
+    ts: timestamp,
     amount,
     currency,
     merchant: merchant || '',
