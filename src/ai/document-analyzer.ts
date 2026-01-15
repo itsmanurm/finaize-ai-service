@@ -12,6 +12,7 @@ export enum DocumentType {
   EGRESO = 'egreso',
   RESUMEN_TARJETA = 'resumen_tarjeta',
   COMPROBANTE = 'comprobante',
+  PAGO_SERVICIOS = 'pago_servicios', // Nuevo tipo para servicios públicos
   OTRO = 'otro'
 }
 
@@ -129,29 +130,52 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
   
   if (isTransfer || isMercadoPago || isPersonalPay) {
     detectedDocType = DocumentType.TRANSFERENCIA;
+  } else if (
+    (lower.includes('litoral') && lower.includes('gas')) || 
+    lower.includes('edenor') || 
+    lower.includes('edesur') || 
+    lower.includes('metrogas') || 
+    lower.includes('aysa') ||
+    lower.includes('telecom') || 
+    lower.includes('personal') ||
+    lower.includes('fibertel') ||
+    lower.includes('movistar') ||
+    lower.includes('claro') ||
+    lower.includes('flow') ||
+    lower.includes('trenes argentinos') || // Transporte
+    lower.includes('operadora ferroviaria') // Legal name Trenes Argentinos
+  ) {
+    detectedDocType = DocumentType.PAGO_SERVICIOS;
   } else if (isFactura) {
     detectedDocType = DocumentType.FACTURA;
   } else if (isRecibo) {
     detectedDocType = DocumentType.RECIBO;
   } else if (isResumenTarjeta) {
     detectedDocType = DocumentType.RESUMEN_TARJETA;
-  } else if (lower.includes('ingreso') || lower.includes('depositado')) {
+  } else if ((lower.includes('ingreso') || lower.includes('depositado')) && !lower.includes('impuesto') && !/ingresos?\s*brutos|imp\.ing\.?|iibb/i.test(lower)) {
     detectedDocType = DocumentType.INGRESO;
   } else if (lower.includes('egreso') || lower.includes('pago')) {
     detectedDocType = DocumentType.EGRESO;
   }
 
   // ===== 2. DIRECCIÓN (mejorado para Personal Pay) =====
-  if (
+  // ===== 2. DIRECCIÓN (mejorado para Personal Pay) =====
+  
+  // Prioridad 1: Si es Pago de Servicios, es SALIDA (gastos)
+  if (detectedDocType === DocumentType.PAGO_SERVICIOS) {
+       direction = TransferDirection.SALIDA;
+  } 
+  // Prioridad 2: Keywords explícitas
+  else if (
     lower.includes('recibiste') ||
     lower.includes('te acreditamos') ||
     lower.includes('te depositamos') ||
-    lower.includes('ingreso') ||
+    (lower.includes('ingreso') && !lower.includes('impuesto') && !/ingresos?\s*brutos|imp\.ing\.?|iibb/i.test(lower)) || // Evitar confusion con IIBB y variantes
     lower.includes('te transferimos') ||
     lower.includes('depositado') ||
     lower.includes('acreditado') ||
-    lower.includes('crédito') ||
-    lower.includes('entrada') ||
+    (lower.includes('crédito') && !lower.includes('nota de crédito') && !lower.includes('imp.s/créd') && !lower.includes('impuesto')) || // Evitar impuestos y creditos fiscales
+    (lower.includes('entrada') && !lower.includes('entrada/salida')) || // Evitar "lugares de entrada/salida"
     lower.includes('recibida') ||
     lower.includes('te enviaron dinero') ||
     lower.includes('te pagó')
@@ -168,131 +192,327 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
     lower.includes('egreso') ||
     lower.includes('salida') ||
     lower.includes('enviada') ||
-    lower.includes('destino')
+    lower.includes('destino') ||
+    lower.includes('total a pagar') || // Facturas suelen implicar pago
+    detectedDocType === DocumentType.FACTURA
   ) {
     direction = TransferDirection.SALIDA;
   } else if (lower.includes('entre tus cuentas') || lower.includes('cuenta propia')) {
     direction = TransferDirection.INTERNA;
   }
 
-  // ===== 3. MONTO (mejorado para formatos argentinos) =====
-  const montoPatterns = [
-    // Mercado Pago style: $ 1.234,56
-    /\$\s*([\d.]+,\d{2})/i,
-    // $ 1.234 (miles con punto, sin decimales - común en UX moderna)
-    /\$\s*(\d{1,3}(?:\.\d{3})+)(?!\d|,)/i,
-    // $ 1234,56 (sin punto miles)
-    /\$\s*(\d+,\d{2})/i,
-    // Explicit labels
-    /monto[:\s]+([\d.,]+)/i,
-    /total[:\s]+([\d.,]+)/i,
-    /importe[:\s]+([\d.,]+)/i,
-    /saldo[:\s]+([\d.,]+)/i,
-    /pago[:\s]+([\d.,]+)/i,
-    // Currency prefix
-    /(?:ars|pesos?)\s*([\d.,]+)/i,
-    // Big numbers with dots as thousand separator: 1.234.567,89
-    /([\d]{1,3}(?:\.[\d]{3})*,[\d]{2})/,
-  ];
+  // ===== 3. MONTO (Lógica mejorada: Detección inteligente de formato US/AR) =====
+  
+  // Función helper para parsear montos ambiguos
+  const parseFlexibleAmount = (raw: string): number | null => {
+      // Limpiar basura
+      let val = raw.trim().replace(/^[^\d]+/, ''); 
+      if (!val) return null;
 
-  for (const pattern of montoPatterns) {
-    const match = clean.match(pattern);
-    if (match?.[1]) {
-      let raw = match[1];
-      console.log(`[Heuristics] Raw monto match: "${raw}" using pattern ${pattern}`);
+      const lastDot = val.lastIndexOf('.');
+      const lastComma = val.lastIndexOf(',');
 
-      const parts = raw.split(/[.,]/);
-      // Caso 1.234.567,89 -> parts > 2 o contiene ','
-      if (raw.includes(',')) {
-         // Formato AR estándar: eliminar puntos, cambiar coma por punto
-         raw = raw.replace(/\./g, '').replace(',', '.');
-      } else if (raw.includes('.')) {
-         // Caso 1.234 (solo puntos de miles) -> eliminar puntos
-         // PRECAUCIÓN: Si es 1.23 (US format), esto lo convierte en 123.
-         // Asumimos AR context: puntos son miles si hay más de uno o si siguen patrón xxx.xxx
-         raw = raw.replace(/\./g, '');
+      // Caso 1: Ambos separadores presentes (Ej: 1,234.56 o 1.234,56)
+      if (lastDot !== -1 && lastComma !== -1) {
+          if (lastDot > lastComma) {
+              // Formato US: 1,234.56 -> eliminar comas
+              val = val.replace(/,/g, '');
+          } else {
+              // Formato AR/EU: 1.234,56 -> eliminar puntos, cambiar coma por punto
+              val = val.replace(/\./g, '').replace(',', '.');
+          }
       }
-
-      const parsed = Number(raw);
-      if (!Number.isNaN(parsed) && parsed > 0 && parsed < 100000000) {
-        detectedFields.monto = parsed;
-        confidence = Math.max(confidence, 0.75);
-        console.log('[Heuristics] Parsed monto:', parsed);
-        break;
+      // Caso 2: Solo comas (Ej: 123,45 o 1,234)
+      else if (lastComma !== -1) {
+          // En contexto AR, la coma suele ser decimal: 123,45
+          // Pero si es "1,234", podría ser mil.
+          // Heurística: si tiene 3 decimales exactos (1,234) y es un número "redondo" visualmente podría ser miles,
+          // pero ante la duda en AR, coma = decimal.
+          // Excepcion: si hay multiples comas "1,234,567" -> imposible en AR, es US.
+          if ((val.match(/,/g) || []).length > 1) {
+              val = val.replace(/,/g, ''); // US Thousands
+          } else {
+              val = val.replace(',', '.'); // AR Decimal
+          }
       }
-    }
-  }
-
-  // ===== 4. FECHA =====
-  const fechaPatterns = [
-    /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/,
-    /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2})/,
-    /(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/,
-    /(\d{1,2})\s+de\s+([a-zA-Z]+)(?:\s+de\s+(\d{4}))?/, // 12 de Diciembre
-    /(\d{1,2})\s+([a-zA-Z]{3})\.?\s+(\d{4})/, // 12 Dic 2024
-  ];
-
-  for (const pattern of fechaPatterns) {
-    const match = clean.match(pattern);
-    if (match) {
-      let day = match[1];
-      let month = match[2];
-      let year = match[3];
-
-      if (Number(day) > 31) {
-        [day, year] = [year, day];
-      }
-
-      if (Number(year) < 100) {
-        year = String(2000 + Number(year));
-      }
-      
-      // Mapeo de meses texto a número si es necesario
-      const monthsEs:Record<string, string> = {
-          'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04', 'mayo': '05', 'junio': '06',
-          'julio': '07', 'agosto': '08', 'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12',
-          'ene': '01', 'feb': '02', 'mar': '03', 'abr': '04', 'may': '05', 'jun': '06',
-          'jul': '07', 'ago': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dic': '12'
-      };
-      
-      if (isNaN(Number(month))) {
-          const lowerMonth = month.toLowerCase();
-          if (monthsEs[lowerMonth]) {
-              month = monthsEs[lowerMonth];
+      // Caso 3: Solo puntos (Ej: 1.234 o 123.45)
+      else if (lastDot !== -1) {
+          // Si hay más de un punto (1.234.567), seguro son miles AR.
+          if ((val.match(/\./g) || []).length > 1) {
+              val = val.replace(/\./g, '');
+          } else {
+              // Un solo punto: "1.234" vs "11607.90"
+              // REGLA MEJORADA: En AR, el punto de miles agrupa de a 3.
+              // Si lo que sigue al punto NO son 3 dígitos exactos, asumo que es decimal.
+              const parts = val.split('.');
+              const lastPart = parts[parts.length - 1]; // Lo que está después del último punto
+              
+              if (lastPart && lastPart.length === 3) {
+                   // Ej: "1.234" -> Probable 1234
+                   // Asumimos miles AR
+                   val = val.replace(/\./g, '');
+              } else {
+                   // Ej: "11607.90" (2 digitos) -> Decimal
+                   // Ej: "12.5" (1 digito) -> Decimal
+                   // Dejar el punto como decimal
+              }
           }
       }
 
-      // IMPORTANTE: Fijar hora a mediodía (12:00) para evitar problemas de Timezone
-      // Si devolvemos YYYY-MM-DD, el constructor Date() asume UTC 00:00, que en GMT-3 es el día anterior.
-      // Devolvemos formato ISO completo.
-      const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T12:00:00.000Z`;
+      const num = Number(val);
+      return isNaN(num) ? null : num;
+  };
+
+  // A) Buscar etiquetas explícitas de TOTAL (Muy confiables)
+  // Regex relajada: captura todo lo que parezca número con separadores
+  // A) Buscar etiquetas explícitas de TOTAL (Muy confiables)
+  // ESTRATEGIA: Buscar TODAS las coincidencias, filtrar falsos positivos ("Sub Total", "P.Total"), 
+  // y elegir el MAYOR monto encontrado (ya que el Total siempre es >= Subtotal/Neto).
+  const totalPatterns = [
+      // Total con posible simbolo de moneda (o OCR fail como S, s, 5)
+      /(?:^|\s)(?:total a pagar|importe total|saldo a pagar|total)(?:[:\s]|$)+(?:[\$Ss5]\s*)?([\d.,]+)/gi,
+      // Total simple con boundary estricto
+      /(?:^|\s)Total(?:[:\s]|$)+\$?\s*([\d.,]+)/gi
+  ];
+  
+  let validTotalCandidates: number[] = [];
+  let montoFound = false;
+
+  for (const pattern of totalPatterns) {
+      let match;
+      while ((match = pattern.exec(clean)) !== null) {
+          const rawAmount = match[1];
+          const fullMatch = match[0];
+          const matchIndex = match.index;
+          
+          // Validación de CONTEXTO: Verificar qué hay justo antes del match
+          const prefixWindow = clean.substring(Math.max(0, matchIndex - 15), matchIndex).toLowerCase();
+          
+          // Ignorar si está precedido por "sub", "p.", "precio", "neto" (si es que la regex de total matcheó solo "total")
+          // Ejemplo: "Sub Total", "P. Total", "Precio Total", "Importe Base"
+          if (/(?:sub|p\.|precio|neto|base)\s*$/.test(prefixWindow)) {
+              console.log(`[Heuristics] Ignoring match due to prefix: "${prefixWindow}" -> "${fullMatch}"`);
+              continue;
+          }
+
+          const parsed = parseFlexibleAmount(rawAmount);
+          if (parsed !== null && parsed > 0) {
+              validTotalCandidates.push(parsed);
+              console.log(`[Heuristics] Candidate TOTAL: ${parsed} (from "${fullMatch}")`);
+          }
+      }
+  }
+
+  // Fallback: Neto / Gravado (si no hay ningun total válido)
+  if (validTotalCandidates.length === 0) {
+       const fallbackPattern = /(?:^|\s)(?:neto|gravado)(?:[:\s]|$)+\$?\s*([\d.,]+)/i;
+       const match = clean.match(fallbackPattern);
+       if (match?.[1]) {
+           const parsed = parseFlexibleAmount(match[1]);
+           if (parsed) validTotalCandidates.push(parsed);
+       }
+       
+       // Fallback 2: P.Total (si realmente no hay nada más, ni total ni neto)
+       if (validTotalCandidates.length === 0) {
+           const pTotalPattern = /(?:^|\s)(?:p\.?\s*total|subtotal)(?:[:\s]|$)+\$?\s*([\d.,]+)/i;
+           const matchPT = clean.match(pTotalPattern);
+           if (matchPT?.[1]) {
+               const parsed = parseFlexibleAmount(matchPT[1]);
+               if (parsed) validTotalCandidates.push(parsed);
+           }
+       }
+  }
+
+  if (validTotalCandidates.length > 0) {
+      // Elegir el MAXIMO monto de los candidatos a TOTAL válido
+      // El Total a pagar suele ser el número más grande de una factura (suma de netos + iva + etc)
+      const maxTotal = Math.max(...validTotalCandidates);
+      detectedFields.monto = maxTotal;
+      confidence = 0.9;
+      console.log(`[Heuristics] Selected BEST TOTAL from candidates: ${maxTotal} (candidates: ${validTotalCandidates.join(', ')})`);
+      montoFound = true;
+  }
+
+  // B) Si no hay Total explícito, buscar el mayor monto encontrado
+  if (!montoFound) {
+      // Patrón general: captura cualquier secuencia de dígitos, puntos y comas
+      const genericMonto = /\$\s*([\d.,]+)/g;
+      const genericNumber = /(?:^|\s)([\d]{1,3}(?:[.,]\d{3})*[.,]\d{2})(?=\s|$)/g; // Números "bien formados" aislados
       
-      detectedFields.fecha = isoDate;
-      confidence = Math.max(confidence, 0.75);
-      console.log('[Heuristics] Found fecha:', detectedFields.fecha);
-      break;
+      let maxMonto = 0;
+      
+      // Combinamos estrategias de búsqueda
+      const rawCandidates: string[] = [];
+      
+      let match;
+      while ((match = genericMonto.exec(clean)) !== null) rawCandidates.push(match[1]);
+      while ((match = genericNumber.exec(clean)) !== null) rawCandidates.push(match[1]);
+      
+      for (const raw of rawCandidates) {
+          const parsed = parseFlexibleAmount(raw);
+          if (parsed !== null && parsed > 0 && parsed < 100000000) {
+              // Filtro de años
+              if (parsed >= 1900 && parsed <= 2100 && Number.isInteger(parsed)) continue;
+              
+              if (parsed > maxMonto) {
+                  maxMonto = parsed;
+              }
+          }
+      }
+      
+      if (maxMonto > 0) {
+          detectedFields.monto = maxMonto;
+          confidence = Math.max(confidence, 0.7);
+          console.log('[Heuristics] Selected MAX monto:', maxMonto);
+      }
+  }
+
+  // ===== 4. FECHA (Filtro Anti-Antigüedad) =====
+  const fechaPatterns = [
+    /fecha de emisión[:\s]*(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/i, // Prioridad Emisión
+    /fecha[:\s]*(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/i, // Prioridad etiqueta "Fecha:"
+    /(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/, // ISO primero
+    /vencimiento[:\s]*(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/i, // Vencimiento (baja prioridad para campo fecha principal)
+    /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/, // DD/MM/YYYY genérico
+    /(\d{1,2})\s+de\s+([a-zA-Z]+)(?:\s+de\s+(\d{4}))?/i, 
+    /(\d{1,2})\s+([a-zA-Z]{3})\.?\s+(\d{4})/i, 
+  ];
+  
+  const currentYear = new Date().getFullYear();
+  const minYear = currentYear - 1; // Solo aceptar fechas recientes (ej. 2025-2026)
+  console.log(`[Heuristics] Date extraction - Current Year: ${currentYear}, Min Year: ${minYear}`);
+
+  for (const pattern of fechaPatterns) {
+    // Usamos loop global para filtrar fechas viejas
+    const globalPat = new RegExp(pattern.source, pattern.flags + 'g');
+    let match;
+    let bestFecha = null;
+    
+    while ((match = globalPat.exec(clean)) !== null) {
+         console.log(`[Heuristics] Date match found with pattern: ${pattern.source}`, match[0]);
+         let day, month, year;
+         
+         // Intentar inferir grupos según patrón
+         if (pattern.source.includes('vencimiento')) { // Vencimiento DD-MM-YYYY
+             day = match[1]; month = match[2]; year = match[3];
+         } else if (match.length >= 4 && match[3]) { // Tiene año explícito (DD de MM de YYYY)
+             if (pattern.source.startsWith('(\\d{4})')) { // ISO YYYY-MM-DD
+                 year = match[1]; month = match[2]; day = match[3];
+             } else {
+                 day = match[1]; month = match[2]; year = match[3];
+             }
+         } else if (match.length >= 3 && !match[3]) { // Fecha sin año (DD de MM)
+             day = match[1]; 
+             month = match[2];
+             
+             // Lógica de inferencia de año:
+             // Normalizar mes primero para poder comparar
+             const monthsEs:Record<string, string> = {
+                'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04', 'mayo': '05', 'junio': '06',
+                'julio': '07', 'agosto': '08', 'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12',
+                'ene': '01', 'feb': '02', 'mar': '03', 'abr': '04', 'may': '05', 'jun': '06',
+                'jul': '07', 'ago': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dic': '12'
+             };
+             let textMonth = month;
+             if (isNaN(Number(month)) && monthsEs[month.toLowerCase()]) { 
+                 textMonth = monthsEs[month.toLowerCase()]; 
+             }
+             
+             const now = new Date();
+             const currentYear = now.getFullYear();
+             const currentMonth = now.getMonth() + 1; // 1-12
+             const currentDay = now.getDate();
+             
+             const m = Number(textMonth);
+             const d = Number(day);
+             
+             // Si la fecha detectada es "futura" respecto a hoy (ej. Hoy es Enero, detecto Diciembre),
+             // asumimos que fue del año pasado.
+             if (m > currentMonth || (m === currentMonth && d > currentDay)) {
+                 year = String(currentYear - 1);
+             } else {
+                 year = String(currentYear);
+             }
+             console.log(`[Heuristics] Inferred year ${year} for date ${day}/${month}`);
+         } else {
+             // Fallback genérico
+             day = match[1]; month = match[2]; year = match[3];
+         }
+         
+         if (Number(day) > 31) [day, year] = [year, day]; // swap simple
+         if (year && Number(year) < 100) year = String(2000 + Number(year));
+         
+         // FILTRO CRÍTICO
+         if (Number(year) < minYear) {
+             console.log(`[Heuristics] Ignoring old date: ${day}/${month}/${year}`);
+             continue;
+         }
+         
+         // Normalizar mes... (código abreviado para update)
+         const monthsEs:Record<string, string> = {
+            'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04', 'mayo': '05', 'junio': '06',
+            'julio': '07', 'agosto': '08', 'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12',
+            'ene': '01', 'feb': '02', 'mar': '03', 'abr': '04', 'may': '05', 'jun': '06',
+            'jul': '07', 'ago': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dic': '12'
+         };
+         if (isNaN(Number(month)) && monthsEs[month.toLowerCase()]) { month = monthsEs[month.toLowerCase()]; }
+         
+         bestFecha = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T12:00:00.000Z`;
+         
+         // Si encontramos una fecha explícita de vencimiento válida, paramos.
+         if (pattern.source.includes('vencimiento')) break;
+    }
+    
+    if (bestFecha) {
+        detectedFields.fecha = bestFecha;
+        confidence = Math.max(confidence, 0.75);
+        console.log('[Heuristics] Found valid fecha:', bestFecha);
+        break;
     }
   }
 
   // ===== 5. CONTRAPARTE =====
-  const contrapartePatterns = [
-    /(?:destino|destina)[\s]*Titular[:\s]+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\w\s\.]+?)(?:\n|$|CBU|Alias)/i,
-    /(?:destinatario)[\s:]+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\w\s\.]{3,50})/i,
-    /(?:empresa|cliente|usuario)[\s:]+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\w\s\.]{3,50})/i,
-    /(?:para|a|remitente)[\s:]+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\w\s\.]{3,50})/i,
-  ];
+  // ===== 5. CONTRAPARTE =====
+  // 5.A) Contraparte por Tipo de Servicio (Más confiable que regex genérica)
+  if (detectedDocType === DocumentType.PAGO_SERVICIOS) {
+       if (lower.includes('personal') || lower.includes('flow')) detectedFields.nombreContraparte = 'Personal Flow';
+       else if (lower.includes('telecom')) detectedFields.nombreContraparte = 'Telecom';
+       else if (lower.includes('movistar')) detectedFields.nombreContraparte = 'Movistar';
+       else if (lower.includes('claro')) detectedFields.nombreContraparte = 'Claro';
+       else if (lower.includes('fibertel')) detectedFields.nombreContraparte = 'Fibertel';
+       else if (lower.includes('edenor')) detectedFields.nombreContraparte = 'Edenor';
+       else if (lower.includes('edesur')) detectedFields.nombreContraparte = 'Edesur';
+       else if (lower.includes('metrogas')) detectedFields.nombreContraparte = 'Metrogas';
+       else if (lower.includes('litoral') && lower.includes('gas')) detectedFields.nombreContraparte = 'Litoral Gas';
+       else if (lower.includes('aysa')) detectedFields.nombreContraparte = 'AySA';
+       else if (lower.includes('trenes argentinos') || lower.includes('operadora ferroviaria')) detectedFields.nombreContraparte = 'Trenes Argentinos';
+       
+       if (detectedFields.nombreContraparte) {
+           console.log('[Heuristics] Inferred Service Provider:', detectedFields.nombreContraparte);
+       }
+  }
 
-  for (const pattern of contrapartePatterns) {
-    const match = clean.match(pattern);
-    if (match?.[1]) {
-      const candidate = match[1].trim();
-      // Exclude if it looks like a date or technical info
-      if (!/^\d|Fecha|operación|comprobante|banco|estado|número/i.test(candidate) && candidate.length > 2) {
-        detectedFields.nombreContraparte = candidate;
-        console.log('[Heuristics] Found contraparte:', detectedFields.nombreContraparte);
-        break;
+  // 5.B) Búsqueda genérica (si no se encontró arriba)
+  if (!detectedFields.nombreContraparte) {
+      const contrapartePatterns = [
+        /(?:destino|destina)[\s]*Titular[:\s]+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\w\s\.]+?)(?:\n|$|CBU|Alias)/i,
+        /(?:destinatario)[\s:]+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\w\s\.]{3,50})/i,
+        /(?:empresa|cliente|usuario)[\s:]+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\w\s\.]{3,50})/i,
+        /(?:para|a|remitente)[\s:]+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\w\s\.]{3,50})/i,
+      ];
+    
+      for (const pattern of contrapartePatterns) {
+        const match = clean.match(pattern);
+        if (match?.[1]) {
+          const candidate = match[1].trim();
+          // Exclude if it looks like a date or technical info
+          if (!/^\d|Fecha|operación|comprobante|banco|estado|número/i.test(candidate) && candidate.length > 2) {
+            detectedFields.nombreContraparte = candidate;
+            console.log('[Heuristics] Found contraparte:', detectedFields.nombreContraparte);
+            break;
+          }
+        }
       }
-    }
   }
 
   // ===== 6. CONCEPTO =====
@@ -374,7 +594,12 @@ export async function analyzeDocument(
     // Remover prefijo data:image si existe
     const cleanBase64 = base64Image.replace(/^data:image\/[a-z]+;base64,/, '');
 
-  const prompt = `Sos un experto analizando documentos financieros ARGENTINOS. Analiza esta imagen con mucho cuidado y extrae TODA la información relevante.
+    const now = new Date();
+    const todayISO = now.toISOString().split('T')[0];
+    const currentYear = now.getFullYear();
+
+  const prompt = `Sos un experto analizando documentos financieros ARGENTINOS. La FECHA DE HOY es: ${todayISO}.
+Analiza esta imagen con mucho cuidado y extrae TODA la información relevante.
 
 APPS Y BANCOS COMUNES EN ARGENTINA:
 - Mercado Pago: "Le pagaste a", "Te pagó", CVU, "Dinero disponible"
@@ -401,8 +626,17 @@ IMPORTANTE - DIRECCIÓN DE TRANSFERENCIAS:
 - "entre tus cuentas" → direction = "interna"
 - No está claro → direction = "indeterminado"
 
+IMPORTANTE - FECHAS (Anti-Alucinación):
+- Busca la fecha en formato YYYY-MM-DD.
+- SI EL DOCUMENTO NO TIENE AÑO (ej: "20 de Diciembre"):
+  - Compáralo con la FECHA DE HOY (${todayISO}).
+  - Si el mes del documento (ej: Dic) ya pasó o es el actual: Asume AÑO ACTUAL (${currentYear}) o AÑO ANTERIOR (${currentYear - 1}) según lógica.
+  - Ej: Si hoy es Enero 2026 y dice "Diciembre", fue en 2025.
+  - Ej: Si hoy es Mayo 2026 y dice "Abril", fue en 2026.
+- ¡NUNCA INVENTES UN AÑO (como 2023) SI NO ESTÁ ESCRITO! Ante la duda, usa el año actual.
+
 EXTRAE TODO LO POSIBLE:
-- fecha: formato YYYY-MM-DD (busca en todo el documento)
+- fecha: formato YYYY-MM-DD
 - monto: solo el número, SIN $ ni puntos de miles (ej: 15000.50)
 - moneda: ARS o USD
 - nombreContraparte: persona o empresa involucrada
@@ -410,7 +644,6 @@ EXTRAE TODO LO POSIBLE:
 - empresa: nombre de la empresa emisora
 - concepto: descripción corta del movimiento
 - numeroFactura: si es factura
-- vencimiento: fecha de vencimiento si aplica
 - metodoPago: transferencia, débito, crédito, efectivo
 
 FORMATO DE RESPUESTA (JSON puro, sin markdown):
@@ -418,7 +651,7 @@ FORMATO DE RESPUESTA (JSON puro, sin markdown):
   "detectedDocType": "transferencia|factura|recibo|ingreso|egreso|resumen_tarjeta|comprobante|otro",
   "direction": "entrada|salida|interna|indeterminado",
   "detectedFields": {
-    "fecha": "2025-01-15",
+    "fecha": "${todayISO}",
     "monto": 15000.50,
     "moneda": "ARS",
     "nombreContraparte": "Nombre",
@@ -494,6 +727,12 @@ FORMATO DE RESPUESTA (JSON puro, sin markdown):
     }
     if (!result.suggestedEntityType) {
       result.suggestedEntityType = SuggestedEntityType.TRANSACTION;
+    }
+
+    // FIX: Normalizar fecha a mediodía para evitar problemas de timezone en frontend
+    if (result.detectedFields.fecha && /^\d{4}-\d{2}-\d{2}$/.test(result.detectedFields.fecha)) {
+       result.detectedFields.fecha = `${result.detectedFields.fecha}T12:00:00.000Z`;
+       console.log('[Document Analyzer] Date normalized to T12:00:', result.detectedFields.fecha);
     }
 
     return result;
@@ -639,6 +878,12 @@ RESPONDE SOLO CON ESTE FORMATO JSON EXACTO (sin markdown, sin explicaciones):
     if (!result.detectedFields) result.detectedFields = {};
     if (!result.confidenceScores) result.confidenceScores = { global: 0.5 };
     if (!result.suggestedEntityType) result.suggestedEntityType = SuggestedEntityType.TRANSACTION;
+
+    // FIX: Normalizar fecha a mediodía para evitar problemas de timezone en frontend
+    if (result.detectedFields.fecha && /^\d{4}-\d{2}-\d{2}$/.test(result.detectedFields.fecha)) {
+       result.detectedFields.fecha = `${result.detectedFields.fecha}T12:00:00.000Z`;
+       console.log('[Document Analyzer] Text-analysis date normalized to T12:00:', result.detectedFields.fecha);
+    }
 
     return result;
 
