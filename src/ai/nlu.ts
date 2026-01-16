@@ -69,7 +69,7 @@ const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
   { name: 'check_budget', re: /\b(puedo comprar|me da el cuero|llego a fin de mes)\b/i },
 
   // Creación/Asignación
-  { name: 'create_budget', re: /\b(presupuesto|presupuesto de|gastar máximo|quiero gastar|asigno|asignar|límite de gasto)\b/i },
+  { name: 'create_budget', re: /\b(presupuesto|presupuesto de|gastar máximo|quiero gastar|asigno|asignar|límite de gasto|aumentar presupuesto|subir presupuesto|agregar.*presupuesto)\b/i },
   { name: 'create_budget', re: /\b(en.*no gastar más de|un máximo de.*para)\b/i },
 
   // Metas/objetivos
@@ -372,7 +372,7 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
 
 ENTIDADES A EXTRAER según el intent:
 - Para gastos/ingresos: amount, currency, merchant, category, description, year, month, day, account (ej: "Efectivo", "Banco", "Tarjeta"), paymentMethod ("efectivo", "debito", "credito")
-- Para presupuestos - CREAR (create_budget): category (o categories: ["A", "B"] si son varias), month, year, amount, currency. (Ej: "QUIERO gastar", "Presupuesto de 200")
+- Para presupuestos - CREAR (create_budget): category, month, year, amount, currency, operation ("set" para fijar/crear, "add" para agregar/aumentar). (Ej: "QUIERO gastar 300" -> set, "AGREGAR 300 al presupuesto" -> add)
 - Para presupuestos - CONSULTAR (check_budget): category, month, year, amount (si pregunta si puede gastar X). (Ej: "PUEDO gastar?", "Me alcanza?", "Cómo voy?")
 - Para metas: amount, currency, description, category, deadline (fecha límite si se menciona), year, month
 - Para cuentas: name (IMPORTANTE: extraer el nombre específico del banco o institución mencionada, NO "nueva cuenta" ni palabras genéricas. Ej: "banco nacion", "Galicia", "BBVA", "Efectivo"), type ("cash", "bank", "card", "investment"), currency, primary, reconciled, archived
@@ -454,7 +454,8 @@ Respuesta: {"intent": "analyze_financial_profile", "confidence": 0.98, "entities
 
 Mensaje: "¿Qué tipo de gastador soy?"
 Respuesta: {"intent": "analyze_financial_profile", "confidence": 0.97, "entities": {}}
-- Si el usuario menciona "quiero gastar", "gastar solo", "gastar máximo", "presupuesto", "no gastar más de", "asigno" (para CREAR presupuesto), responde con intent "create_budget" y extrae category, month, year, amount.
+- Si el usuario menciona "quiero gastar", "gastar solo", "gastar máximo", "presupuesto", "no gastar más de", "asigno" (para CREAR presupuesto), responde con intent "create_budget" y extrae category, month, year, amount, operation: "set".
+- Si el usuario dice "agregar al presupuesto", "aumentar presupuesto", "subir tope" (para MODIFICAR), responde con intent "create_budget" y extrae category, amount, operation: "add".
 - Si el usuario pregunta "PUEDO gastar", "me alcanza", "cómo voy con el presupuesto", "tengo saldo para", responde con intent "check_budget" y extrae category (si hay), amount (si pregunta por un monto específico), month, year.
 - Si el usuario expresa un deseo de COMPRAR o AHORRAR PARA algo específico ("quiero ahorrar", "meta de", "objetivo de"), responde con intent "create_goal" y extrae amount, currency, description, category, deadline (si se menciona), year, month.
 - Si el usuario menciona que YA AHORRÓ o AGREGÓ dinero a una meta existente (ej: "ahorré", "guardé", "puse", "agregué"), responde con intent "add_contribution" y extrae amount, goalName (nombre de la meta), description.
