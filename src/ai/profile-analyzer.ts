@@ -578,7 +578,7 @@ function generateRecommendations(params: {
   recommendations.push({
     priority: 'Alta',
     category: 'Ahorro',
-    title: 'Separátu ahorro en una cuenta distinta',
+    title: 'Separá tu ahorro en una cuenta distinta',
     description:
       'Si tu ahorro vive en la misma cuenta que tu plata diaria, es más fácil gastarlo sin darte cuenta. Separarlo te ayuda a respetarlo como una prioridad.'
   });
@@ -723,7 +723,7 @@ function generateRecommendations(params: {
     recommendations.push({
       priority: 'Media',
       category: 'Ahorro',
-      title: 'Separáel fondo de emergencia del ahorro común',
+      title: 'Separá el fondo de emergencia del ahorro común',
       description:
         'El fondo de emergencia no se toca para gustos o compras planificadas. Tenerlo separado te ayuda a respetarlo como una herramienta de estabilidad.'
     });
@@ -749,7 +749,7 @@ function generateRecommendations(params: {
     recommendations.push({
       priority: 'Media',
       category: 'Ahorro',
-      title: 'Separáel fondo de emergencia del ahorro común',
+      title: 'Separá el fondo de emergencia del ahorro común',
       description:
         'Tener el fondo separado te ayuda a no mezclarlo con gastos o metas. Eso mejora tu estabilidad mensual incluso si todavía estás construyéndolo.'
     });
