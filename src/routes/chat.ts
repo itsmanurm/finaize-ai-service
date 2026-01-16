@@ -101,6 +101,48 @@ r.post('/chat', async (req, res) => {
         } else {
           reply = 'No pude obtener las cotizaciones del dólar en este momento. Intentá de nuevo en unos minutos.';
         }
+      } else if (nlu.intent === 'help' || message.toLowerCase().includes('ayudar')|| message.toLowerCase().includes('podes hacer') || message.toLowerCase().includes('puedes hacer')) {
+        reply = `¡Hola! Soy tu **Asistente Financiero con IA** 🤖✨
+
+**Puedo ayudarte con:**
+
+📊 **Análisis de tus finanzas personales**
+• Analizar tus gastos por categoría y período
+• Comparar meses y detectar tendencias
+• Identificar gastos inusuales o anómalos
+• Revisar el uso de tus presupuestos
+• Detectar suscripciones duplicadas
+
+💡 **Recomendaciones personalizadas**
+• Sugerencias para ahorrar dinero
+• Optimización de gastos recurrentes
+• Identificación de oportunidades de mejora
+• Estrategias adaptadas a tu perfil financiero
+
+💬 **Consultas sobre economía y finanzas**
+• Conceptos de ahorro e inversión
+• Consejos de presupuesto personal
+• Información sobre herramientas financieras
+• Educación financiera en general
+
+**Ejemplos de preguntas que podés hacer:**
+
+*Sobre tus datos:*
+• "¿Cuánto gasté en comida este mes?"
+• "¿Cómo vienen mis gastos de transporte?"
+• "Compará este mes vs. el anterior"
+• "¿En qué categoría gasto más?"
+• "¿Cómo van mis presupuestos?"
+• "¿Tengo suscripciones duplicadas?"
+
+*Sobre economía en general:*
+• "¿Cómo puedo armar un presupuesto?"
+• "¿Qué es el ahorro automático?"
+• "¿Cuál es la regla del 50/30/20?"
+• "¿Cómo empezar a invertir?"
+• "Consejos para reducir gastos"
+
+¡Preguntame lo que necesites! 🚀`;
       }
     } else {
       // Logging avanzado de intents no cubiertos
