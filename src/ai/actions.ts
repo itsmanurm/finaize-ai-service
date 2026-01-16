@@ -131,13 +131,68 @@ import { appendJsonl } from '../utils/jsonl';
 import { categorize } from './enhanced-service';
 import { getArgentinaDate } from '../utils/date-parser';
 
-export async function actionAddExpense(payload: { amount: number; currency?: string; merchant?: string; description?: string; when?: string; account?: string; paymentMethod?: string }, persist = true) {
-  const { amount, currency = 'ARS', merchant, description, when, paymentMethod } = payload;
+const BACKEND_URL = process.env.FINAIZE_BACKEND_URL || 'http://localhost:3001';
+
+async function getAccounts(token?: string) {
+  if (!token) {
+    console.warn('[actions] getAccounts: No token provided');
+    return [];
+  }
+  try {
+    const url = `${BACKEND_URL}/api/accounts?archived=all`;
+    console.log('[actions] Fetching accounts from:', url);
+    const res = await fetch(url, {
+      headers: { 'Authorization': token }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const accounts = Array.isArray(data) ? data : (data.accounts || []);
+      console.log(`[actions] Fetched ${accounts.length} accounts. Names:`, accounts.map((a: any) => `${a.name} (archived: ${a.archived})`).join(', '));
+      return accounts;
+    } else {
+      console.error('[actions] Failed to fetch accounts. Status:', res.status);
+    }
+  } catch (err) {
+    console.warn('[actions] Failed to fetch accounts:', err);
+  }
+  return [];
+}
+
+export async function actionAddExpense(payload: { amount: number; currency?: string; merchant?: string; description?: string; when?: string; account?: string; paymentMethod?: string; token?: string }, persist = true) {
+  const { amount, currency = 'ARS', merchant, description, when, paymentMethod, token } = payload;
   
-  // Resolve account based on currency
+  // Resolve account based on currency and keywords
   let account = payload.account || 'Efectivo';
-  if (currency === 'USD' && account.toLowerCase() === 'efectivo') {
-    account = 'Efectivo USD';
+  
+  // Normalize account name to lowercase for comparison
+  const accountLower = (account || '').toLowerCase().trim();
+  
+  // Smart account resolution based on keywords first (overrides default currency if needed)
+  if (accountLower.includes('dolar') || accountLower.includes('usd') || accountLower.includes('verde')) {
+     account = 'Efectivo USD';
+     // Implicitly correct currency if needed, though strictly we stick to payload currency unless we want to auto-fix it too
+  } else if (accountLower.includes('peso') || accountLower.includes('ars')) {
+     account = 'Efectivo';
+  } else if (currency === 'USD') {
+    // If currency is USD and account is generic or empty, default to Efectivo USD
+    if (accountLower === 'efectivo' || !accountLower) {
+      account = 'Efectivo USD';
+    }
+  } else {
+    // Default ARS/Generic
+    if (accountLower === 'efectivo' || !accountLower) {
+      account = 'Efectivo';
+    }
+  }
+
+  // Check for archived account
+  let warning = '';
+  if (token) {
+    const accounts = await getAccounts(token);
+    const matched = accounts.find((a: any) => a.name.toLowerCase() === account.toLowerCase());
+    if (matched && matched.archived) {
+      warning = `⚠️ *Atención*: La cuenta **${account}** está archivada.`;
+    }
   }
 
   const categorized = await categorize({ description: description || '', merchant, amount, currency: currency as any });
@@ -182,8 +237,87 @@ export async function actionAddExpense(payload: { amount: number; currency?: str
     }
   }
 
-  return { ok: true, record };
+  return { ok: true, record, warning };
 }
+
+export async function actionAddIncome(payload: { amount: number; currency?: string; source?: string; description?: string; when?: string; account?: string; category?: string; token?: string }, persist = true) {
+  const { amount, currency = 'ARS', source, description, when, token } = payload;
+  
+  // Resolve account based on currency and keywords (same logic as expenses)
+  let account = payload.account || 'Efectivo';
+  
+  // Normalize account name to lowercase for comparison
+  const accountLower = (account || '').toLowerCase().trim();
+  
+  // Smart account resolution based on keywords first (overrides default currency if needed)
+  if (accountLower.includes('dolar') || accountLower.includes('usd') || accountLower.includes('verde')) {
+     account = 'Efectivo USD';
+     // Implicitly correct currency if needed, though strictly we stick to payload currency unless we want to auto-fix it too
+  } else if (accountLower.includes('peso') || accountLower.includes('ars')) {
+     account = 'Efectivo';
+  } else if (currency === 'USD') {
+    // If currency is USD and account is generic or empty, default to Efectivo USD
+    if (accountLower === 'efectivo' || !accountLower) {
+      account = 'Efectivo USD';
+    }
+  } else {
+    // Default ARS/Generic
+    if (accountLower === 'efectivo' || !accountLower) {
+      account = 'Efectivo';
+    }
+  }
+
+  // Check for archived account
+  let warning = '';
+  if (token) {
+    const accounts = await getAccounts(token);
+    const matched = accounts.find((a: any) => a.name.toLowerCase() === account.toLowerCase());
+    if (matched && matched.archived) {
+      warning = `⚠️ *Atención*: La cuenta **${account}** está archivada.`;
+    }
+  }
+
+  // Si se proporciona 'when', parsear esa fecha; si no, usar fecha actual de Argentina
+  let timestamp: string;
+  if (when) {
+    try {
+      const whenDate = new Date(when);
+      if (!isNaN(whenDate.getTime())) {
+        timestamp = whenDate.toISOString();
+      } else {
+        timestamp = getArgentinaDate().toISOString();
+      }
+    } catch {
+      timestamp = getArgentinaDate().toISOString();
+    }
+  } else {
+    timestamp = getArgentinaDate().toISOString();
+  }
+
+  const record = {
+    ts: timestamp,
+    amount: -Math.abs(amount), // Ingresos son negativos en el sistema
+    currency,
+    source: source || '',
+    description: description || source || 'Ingreso',
+    category: payload.category || 'Ingreso',
+    account: account,
+    paymentMethod: 'transferencia',
+    confidence: 1.0,
+    dedupHash: `income_${timestamp}_${amount}_${currency}`
+  };
+
+  if (persist) {
+    try {
+      await appendJsonl('transactions.jsonl', record);
+    } catch (err) {
+      console.warn('Failed to persist income transaction locally:', (err as any)?.message || err);
+    }
+  }
+
+  return { ok: true, record, warning };
+}
+
 
 export async function actionQuerySummary(payload: { items?: any[]; classifyMissing?: boolean; currency?: string; periodLabel?: string; category?: string; merchant?: string; year?: number; month?: number }) {
   // Leer historial de transacciones

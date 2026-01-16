@@ -39,6 +39,7 @@ r.post('/chat', async (req, res) => {
     ];
     const actionsMap: Record<string, Function> = {
       add_expense: actionAddExpense,
+      add_income: require('../ai/actions').actionAddIncome,
       query_summary: actionQuerySummary,
       query_top_expenses: actionQuerySummary,
       query_dollar_rate: actionQueryDollar,
@@ -68,12 +69,25 @@ r.post('/chat', async (req, res) => {
       if (created.length) reply = `Registrados ${created.length} gastos.`;
       else reply = 'No se pudieron registrar los gastos.';
     } else if (nlu.intent && actionFn) {
-      // Pasar entidades extraídas como opciones de filtrado
-      const opts = { ...options, ...nlu.entities, intent: nlu.intent };
+      // Pasar entidades extraídas como opciones de filtrado, incluyendo info de sesión/auth
+      const opts = { 
+        ...options, 
+        ...nlu.entities, 
+        intent: nlu.intent,
+        token: req.headers.authorization // Pasar token para validaciones contra backend
+      };
       actionResult = await actionFn(opts);
       // Respuesta adaptada según intent
       if (nlu.intent === 'add_expense') {
         reply = `Gasto registrado: ${actionResult.record.category} ${actionResult.record.amount} ${actionResult.record.currency}`;
+        if (actionResult.warning) {
+          reply += `\n\n${actionResult.warning}`;
+        }
+      } else if (nlu.intent === 'add_income') {
+        reply = `✅ Ingreso registrado: ${actionResult.record.currency} ${Math.abs(actionResult.record.amount)}`;
+        if (actionResult.warning) {
+          reply += `\n\n${actionResult.warning}`;
+        }
       } else if (nlu.intent === 'query_summary') {
         reply = `Resumen: ingreso ${actionResult.totals.income}, gasto ${actionResult.totals.expense}, neto ${actionResult.totals.net}`;
       } else if (nlu.intent === 'query_top_expenses') {
