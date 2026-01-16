@@ -59,6 +59,8 @@ function dedupHash(v: {
   return createHash('sha1').update(parts.join('|')).digest('hex');
 }
 
+
+
 export async function categorize(input: CategorizeInput): Promise<CategorizeOutput> {
   // Verificar cache primero
   const cacheKey = {
@@ -103,6 +105,8 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
     await setCachedCategorization(cacheKey, result);
     return result;
   }
+
+
 
   const merchant_clean = normalizeMerchant(input.merchant || '');
   const bag = [merchant_clean, input.description].filter(Boolean).join(' ').trim();

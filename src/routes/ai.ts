@@ -3,7 +3,7 @@ import { ItemSchema, FeedbackSchema, SummarizeSchema, ForecastRequestSchema, Ano
 import { categorize } from '../ai/service';
 import { appendJsonl } from '../utils/jsonl';
 import { parseMessage } from '../ai/nlu';
-import { analyzeFinancialProfile, formatProfileForChat } from '../ai/profile-analyzer';
+import { analyzeFinancialProfile } from '../ai/profile-analyzer';
 import { AnomalyService } from '../ai/anomaly';
 
 const r = Router();
