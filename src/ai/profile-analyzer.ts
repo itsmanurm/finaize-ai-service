@@ -14,10 +14,15 @@ export interface Transaction {
 }
 
 export interface Budget {
+  name?: string;
   category: string;
+  categories?: string[];
   amount: number;
   month: number;
   year: number;
+  currency?: 'ARS' | 'USD';
+  autoRenew?: boolean;
+  archived?: boolean;
 }
 
 export interface Goal {
@@ -26,6 +31,24 @@ export interface Goal {
   currentAmount: number;
   deadline?: string;
   currency?: 'ARS' | 'USD';
+}
+
+export interface BudgetCompliance {
+  totalBudgets: number;
+  activeBudgets: number;        // No archivados
+  exceededBudgets: number;      // Over 100%
+  nearLimitBudgets: number;     // 80-100%
+  healthyBudgets: number;       // <80%
+  avgUsagePercent: number;      // Promedio de % usado
+  complianceScore: number;      // 0-100 (qué tan bien se cumplen)
+  complianceRate: number;       // % de presupuestos respetados (<100%)
+  problematicCategories: Array<{
+    category: string;
+    budgetAmount: number;
+    actualSpent: number;
+    usagePercent: number;
+    suggestion: string;
+  }>;
 }
 
 export interface FinancialProfileInput {
@@ -72,6 +95,9 @@ export interface FinancialProfile {
     avgTransactionSize: number;
     largeExpensesCount: number; // Gastos >50% del ingreso promedio
   };
+
+  // Análisis de cumplimiento de presupuestos
+  budgetCompliance?: BudgetCompliance;
 
   // Capacidad financiera
   capacity: {
@@ -126,6 +152,11 @@ export function analyzeFinancialProfile(input: FinancialProfileInput): Financial
   // Analizar hábitos
   const habits = analyzeHabits(transactions, budgets, goals, avgMonthlyIncome);
 
+  // Analizar cumplimiento de presupuestos (si tiene presupuestos activos)
+  const budgetCompliance = budgets.length > 0 
+    ? analyzeBudgetCompliance(budgets, expenses, timeframeMonths)
+    : undefined;
+
   // Calcular health score
   const healthScore = calculateHealthScore({
     savingsRate,
@@ -135,7 +166,8 @@ export function analyzeFinancialProfile(input: FinancialProfileInput): Financial
     planningScore: patterns.planningScore,
     usesbudgets: habits.usesbudgets,
     hasGoals: habits.hasGoals,
-    trackingConsistency: habits.trackingConsistency
+    trackingConsistency: habits.trackingConsistency,
+    budgetComplianceScore: budgetCompliance?.complianceScore
   });
 
   // Clasificar perfil
@@ -158,7 +190,8 @@ export function analyzeFinancialProfile(input: FinancialProfileInput): Financial
     hasGoals: habits.hasGoals,
     impulseScore: patterns.impulseScore,
     planningScore: patterns.planningScore,
-    healthScore
+    healthScore,
+    budgetCompliance
   });
 
   // Generar recomendaciones personalizadas
@@ -175,7 +208,8 @@ export function analyzeFinancialProfile(input: FinancialProfileInput): Financial
     capacity,
     recurringExpenses: patterns.recurringExpenses,
     impulseScore: patterns.impulseScore,
-    trackingConsistency: habits.trackingConsistency
+    trackingConsistency: habits.trackingConsistency,
+    budgetCompliance
   });
 
   return {
@@ -192,6 +226,7 @@ export function analyzeFinancialProfile(input: FinancialProfileInput): Financial
     },
     patterns,
     habits,
+    budgetCompliance,
     capacity,
     strengths,
     improvements,
@@ -295,6 +330,118 @@ function detectSpendingPatterns(expenses: Transaction[]): FinancialProfile['patt
 }
 
 /**
+ * Analiza el cumplimiento de presupuestos
+ */
+function analyzeBudgetCompliance(
+  budgets: Budget[],
+  expenses: Transaction[],
+  timeframeMonths: number
+): BudgetCompliance {
+  // Filtrar presupuestos no archivados (activos)
+  const activeBudgets = budgets.filter(b => !b.archived);
+  
+  if (activeBudgets.length === 0) {
+    return {
+      totalBudgets: budgets.length,
+      activeBudgets: 0,
+      exceededBudgets: 0,
+      nearLimitBudgets: 0,
+      healthyBudgets: 0,
+      avgUsagePercent: 0,
+      complianceScore: 0,
+      complianceRate: 0,
+      problematicCategories: []
+    };
+  }
+
+  // Calcular gastos por categoría en el período de cada presupuesto
+  const categoryUsage = new Map<string, { budget: Budget; spent: number }>();
+
+  activeBudgets.forEach(budget => {
+    const categories = budget.categories && budget.categories.length > 0 
+      ? budget.categories 
+      : [budget.category];
+
+    // Filtrar transacciones del mes/año del presupuesto
+    const budgetExpenses = expenses.filter(t => {
+      const date = new Date(t.date);
+      const expenseMonth = date.getMonth() + 1;
+      const expenseYear = date.getFullYear();
+      return expenseMonth === budget.month && expenseYear === budget.year && categories.includes(t.category);
+    });
+
+    const spent = budgetExpenses.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    const key = `${budget.year}-${budget.month}-${categories.join('|')}`;
+    categoryUsage.set(key, { budget, spent });
+  });
+
+  // Analizar cada presupuesto
+  let exceededCount = 0;
+  let nearLimitCount = 0;
+  let healthyCount = 0;
+  let totalUsagePercent = 0;
+  const problematic: BudgetCompliance['problematicCategories'] = [];
+
+  categoryUsage.forEach(({ budget, spent }) => {
+    const usagePercent = budget.amount > 0 ? (spent / budget.amount) * 100 : 0;
+    totalUsagePercent += usagePercent;
+
+    if (usagePercent >= 100) {
+      exceededCount++;
+      problematic.push({
+        category: budget.name || budget.category,
+        budgetAmount: budget.amount,
+        actualSpent: Math.round(spent),
+        usagePercent: Math.round(usagePercent),
+        suggestion: usagePercent >= 150 
+          ? 'Exceso crítico: considera revisar tus hábitos de gasto en esta categoría'
+          : 'Presupuesto excedido: ajusta el monto o reduce gastos el próximo mes'
+      });
+    } else if (usagePercent >= 80) {
+      nearLimitCount++;
+    } else {
+      healthyCount++;
+    }
+  });
+
+  const avgUsagePercent = categoryUsage.size > 0 
+    ? totalUsagePercent / categoryUsage.size 
+    : 0;
+
+  const complianceRate = categoryUsage.size > 0 
+    ? ((categoryUsage.size - exceededCount) / categoryUsage.size) * 100 
+    : 0;
+
+  // Calcular compliance score (0-100)
+  let complianceScore = 50; // Base
+
+  // Bonus por tasa de cumplimiento
+  if (complianceRate >= 90) complianceScore += 40;
+  else if (complianceRate >= 75) complianceScore += 30;
+  else if (complianceRate >= 50) complianceScore += 15;
+  else if (complianceRate < 30) complianceScore -= 20;
+
+  // Penalty por uso promedio alto
+  if (avgUsagePercent >= 95) complianceScore -= 15;
+  else if (avgUsagePercent >= 85) complianceScore -= 5;
+  else if (avgUsagePercent < 70) complianceScore += 10;
+
+  complianceScore = Math.max(0, Math.min(100, complianceScore));
+
+  return {
+    totalBudgets: budgets.length,
+    activeBudgets: activeBudgets.length,
+    exceededBudgets: exceededCount,
+    nearLimitBudgets: nearLimitCount,
+    healthyBudgets: healthyCount,
+    avgUsagePercent: Math.round(avgUsagePercent),
+    complianceScore: Math.round(complianceScore),
+    complianceRate: Math.round(complianceRate),
+    problematicCategories: problematic.slice(0, 3) // Top 3 más problemáticos
+  };
+}
+
+/**
  * Analiza hábitos financieros del usuario
  */
 function analyzeHabits(
@@ -347,6 +494,7 @@ function calculateHealthScore(params: {
   usesbudgets: boolean;
   hasGoals: boolean;
   trackingConsistency: number;
+  budgetComplianceScore?: number;
 }): number {
   let score = 50; // Base
 
@@ -368,9 +516,18 @@ function calculateHealthScore(params: {
   else if (params.planningScore > params.impulseScore) score += 10;
   else if (params.impulseScore > params.planningScore + 30) score -= 15;
 
-  // Uso de herramientas (+10 puntos por budgets, +10 por goals)
-  if (params.usesbudgets) score += 10;
+  // Uso de herramientas (+5 por budgets, +10 por goals)
+  if (params.usesbudgets) score += 5;
   if (params.hasGoals) score += 10;
+
+  // Disciplina presupuestaria (hasta +15 o -15 puntos)
+  if (params.budgetComplianceScore !== undefined) {
+    if (params.budgetComplianceScore >= 80) score += 15;
+    else if (params.budgetComplianceScore >= 60) score += 10;
+    else if (params.budgetComplianceScore >= 40) score += 5;
+    else if (params.budgetComplianceScore < 30) score -= 15;
+    else score -= 5;
+  }
 
   // Consistencia (+5 puntos)
   if (params.trackingConsistency >= 50) score += 5;
@@ -478,6 +635,7 @@ function identifyStrengthsAndImprovements(params: {
   impulseScore: number;
   planningScore: number;
   healthScore: number;
+  budgetCompliance?: BudgetCompliance;
 }): { strengths: string[]; improvements: string[] } {
   const strengths: string[] = [];
   const improvements: string[] = [];
@@ -490,6 +648,11 @@ function identifyStrengthsAndImprovements(params: {
   if (params.planningScore > params.impulseScore + 20) strengths.push('Alta capacidad de planificación');
   if (params.healthScore >= 80) strengths.push('Salud financiera sobresaliente');
 
+  // Fortaleza adicional: buena disciplina presupuestaria
+  if (params.budgetCompliance && params.budgetCompliance.complianceRate >= 80) {
+    strengths.push('Excelente disciplina en el cumplimiento de presupuestos');
+  }
+
   // Áreas de mejora
   if (params.savingsRate < 5) improvements.push('Aumentar tu tasa de ahorro mensual');
   if (params.expenseToIncomeRatio >= 1.0) improvements.push('Reducir gastos para evitar déficit');
@@ -497,6 +660,11 @@ function identifyStrengthsAndImprovements(params: {
   if (!params.hasGoals) improvements.push('Establecer metas financieras claras');
   if (params.impulseScore > 70) improvements.push('Controlar compras impulsivas');
   if (params.healthScore < 40) improvements.push('Revisar urgentemente tus hábitos financieros');
+
+  // Mejora adicional: cumplimiento de presupuestos
+  if (params.budgetCompliance && params.budgetCompliance.complianceRate < 50) {
+    improvements.push('Mejorar el cumplimiento de presupuestos o ajustar montos');
+  }
 
   if (strengths.length === 0) strengths.push('Estás comenzando a tomar control de tus finanzas');
   if (improvements.length === 0) improvements.push('Mantener los buenos hábitos actuales');
@@ -521,8 +689,87 @@ function generateRecommendations(params: {
   recurringExpenses: FinancialProfile['patterns']['recurringExpenses'];
   impulseScore: number;
   trackingConsistency: number;
+  budgetCompliance?: BudgetCompliance;
 }): FinancialProfile['recommendations'] {
   const recommendations: FinancialProfile['recommendations'] = [];
+
+  // ----------------------------
+  // 0) PRESUPUESTOS - ANÁLISIS DE COMPLIANCE
+  // ----------------------------
+  if (params.budgetCompliance) {
+    const bc = params.budgetCompliance;
+
+    // Si excede muchos presupuestos
+    if (bc.exceededBudgets >= 2 && bc.complianceRate < 60) {
+      const totalOverage = bc.problematicCategories.reduce(
+        (sum, cat) => sum + (cat.actualSpent - cat.budgetAmount),
+        0
+      );
+
+      recommendations.push({
+        priority: 'Alta',
+        category: 'Presupuesto',
+        title: 'Presupuestos excedidos regularmente',
+        description: `Estas excediendo ${bc.exceededBudgets} de ${bc.activeBudgets} presupuestos (${Math.round(bc.complianceRate)}% de cumplimiento). ` +
+          `Opciones: 1) Ajusta los montos para ser más realista, 2) Reduce gastos en las categorías problemáticas. ` +
+          `Total excedido: ${formatCurrency(Math.round(totalOverage))}.`,
+        potentialSavings: Math.round(totalOverage)
+      });
+
+      // Recomendaciones específicas por categoría problemática
+      bc.problematicCategories.forEach((cat, idx) => {
+        if (idx < 2) { // Solo las 2 más problemáticas
+          recommendations.push({
+            priority: cat.usagePercent >= 150 ? 'Alta' : 'Media',
+            category: 'Reducción de gastos',
+            title: `Revisa gastos en "${cat.category}"`,
+            description: `Gastaste ${formatCurrency(cat.actualSpent)} cuando tu presupuesto era ${formatCurrency(cat.budgetAmount)} (${cat.usagePercent}% de uso). ` +
+              cat.suggestion,
+            potentialSavings: Math.round(cat.actualSpent - cat.budgetAmount)
+          });
+        }
+      });
+    }
+
+    // Si usa presupuestos pero están demasiado holgados
+    if (bc.avgUsagePercent < 60 && bc.activeBudgets >= 2) {
+      recommendations.push({
+        priority: 'Baja',
+        category: 'Presupuesto',
+        title: 'Presupuestos sobredimensionados',
+        description: `Tus presupuestos solo se usan al ${bc.avgUsagePercent}% en promedio. ` +
+          `Esto sugiere que son demasiado altos. Considera ajustarlos a montos más realistas o redistribuir ese dinero hacia ahorro.`
+      });
+    }
+
+    // Si tiene buena disciplina
+    if (bc.complianceRate >= 80 && bc.activeBudgets >= 2) {
+      recommendations.push({
+        priority: 'Baja',
+        category: 'Presupuesto',
+        title: 'Excelente disciplina presupuestaria',
+        description: `Estas cumpliendo ${Math.round(bc.complianceRate)}% de tus presupuestos. ` +
+          `Para optimizar tiempo, considera activar la opción de auto-renovación en presupuestos recurrentes.`
+      });
+    }
+  }
+
+  // Si NO usa presupuestos
+  if (!params.usesbudgets && params.topCategories.length >= 3) {
+    const topCats = params.topCategories.slice(0, 3).map(c => c.category).join(', ');
+    const estimatedSavings = Math.round(
+      params.topCategories.slice(0, 3).reduce((sum, c) => sum + c.amount, 0) * 0.15
+    );
+
+    recommendations.push({
+      priority: 'Alta',
+      category: 'Presupuesto',
+      title: 'Crea presupuestos para tus categorías principales',
+      description: `Empezá con 3 presupuestos básicos para tus categorías de mayor gasto: ${topCats}. ` +
+        `Esto te ayudará a tomar control y potencialmente ahorrar hasta ${formatCurrency(estimatedSavings)} mensuales.`,
+      potentialSavings: estimatedSavings
+    });
+  }
 
   // ----------------------------
   // 1) AHORRO PRINCIPAL
