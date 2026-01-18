@@ -1,0 +1,14 @@
+{
+  "data": {
+    "category": "Sin clasificar",
+    "confidence": 0.7,
+    "reasons": [
+      "ai:La descripción 'gasté 10000 pesos' es ambigua y no proporciona información suficiente sobre el tipo de gasto. No se especifica el comercio ni la naturaleza del gasto, lo que dificulta su clasificación precisa."
+    ],
+    "merchant_clean": "",
+    "dedupHash": "3ebe3869ed2fa10737673e5b5c505559f4846936",
+    "aiEnhanced": true,
+    "aiReasoning": "La descripción 'gasté 10000 pesos' es ambigua y no proporciona información suficiente sobre el tipo de gasto. No se especifica el comercio ni la naturaleza del gasto, lo que dificulta su clasificación precisa."
+  },
+  "timestamp": 1768760482353
+}
