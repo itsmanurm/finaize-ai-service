@@ -164,6 +164,32 @@ export async function parseMessage(message: string): Promise<NLUResult> {
     entities.month = now.getMonth() + 1;
     entities.year = now.getFullYear();
   }
+  
+  // CRÍTICO: Detectar comparaciones con "mes anterior" o "el anterior"
+  // Esto debe procesarse ANTES de OpenAI para garantizar la correcta interpretación
+  if (/(compar|vs\.?|versus|frente a).*(mes\s+)?anterior|anterior.*mes/i.test(message)) {
+    const now = getArgentinaDate();
+    const currentMonth = now.getMonth() + 1; // 1-12
+    const currentYear = now.getFullYear();
+    
+    // Establecer período actual (este mes)
+    entities.month = currentMonth;
+    entities.year = currentYear;
+    
+    // Calcular mes anterior cronológicamente
+    if (currentMonth === 1) {
+      // Si estamos en enero, el mes anterior es diciembre del año pasado
+      entities.compare_month = 12;
+      entities.compare_year = currentYear - 1;
+    } else {
+      // Para cualquier otro mes, es simplemente mes - 1 del mismo año
+      entities.compare_month = currentMonth - 1;
+      entities.compare_year = currentYear;
+    }
+    
+    logNLU('info', `Comparación detectada: ${entities.month}/${entities.year} vs ${entities.compare_month}/${entities.compare_year}`);
+  }
+  
   // Si el mensaje contiene 'transferí', asignar categoría transferencia
   if (/transfer[ií]/i.test(message)) {
     entities.category = 'transferencia';
@@ -407,6 +433,12 @@ IMPORTANTE - REFERENCIAS TEMPORALES (HOY es ${now.getDate()}/${currentMonth}/${c
 - Si el usuario dice "este año", usar year: ${currentYear}
 - Si el usuario dice "el año que viene" o "próximo año", usar year: ${nextYear}
 - Si el usuario dice "este mes", usar month: ${currentMonth}, year: ${currentYear}
+- CRÍTICO - Para comparaciones con "mes anterior" o "el anterior":
+  * Si el usuario dice "comparar con el mes anterior" o "vs el anterior": calcular el mes INMEDIATAMENTE ANTERIOR cronológicamente
+  * Si estamos en enero (mes ${currentMonth}): mes anterior = diciembre del año pasado (compare_month: 12, compare_year: ${lastYear})
+  * Si estamos en cualquier otro mes: mes anterior = mes actual - 1 del mismo año (compare_month: ${currentMonth - 1}, compare_year: ${currentYear})
+  * "Mes anterior" NO significa el mismo mes del año pasado, significa el mes cronológicamente previo
+  * Ejemplo: Si hoy es enero 2026 y dice "comparar con el anterior", debe ser diciembre 2025, NO enero 2025
 - CRÍTICO - Para add_expense e add_income:
   * Si el usuario usa tiempo pasado simple ("gasté", "pagué", "compré", "saqué", "retiré", "gané", "cobré", "cargué", "recibí", "me pagaron", "me acreditaron") SIN mencionar fecha explícita (ej: "ayer", "el lunes", "hace 3 días"), asumir que es HOY
   * Si el usuario dice explícitamente "hoy", usar day: ${now.getDate()}, month: ${currentMonth}, year: ${currentYear}
@@ -458,7 +490,7 @@ REGLAS ADICIONALES:
 - Si el usuario menciona crear una categoría nueva, responde con intent "create_category" y extrae name, type ("income" o "expense"), icon, color, budgetLimit.
 - Si el usuario menciona invertir, comprar activos CON monto específico, responde con intent "invest" y extrae activo, amount, currency, periodo, tipo.
 - Si el usuario menciona GASTOS, pagos, compras, retiros, extracciones, transferencias a terceros (ej: "gasté", "pagué", "compré", "saqué plata", "retiré", "extraje", "me cobraron", "salió", "salieron", "compro", "pago", "transferí a [persona/comercio]"), responde con intent "add_expense" y extrae amount, currency ('ARS' o 'USD'), merchant, category, description, year, month, day, account, paymentMethod (usar referencias temporales de arriba). CONTEXTO ARGENTINO: "saqué" generalmente significa retiro de cajero o gasto, NO ingreso.
-- Si el usuario pregunta por resumen, balance, gastos con comparación entre períodos (ej: "en comparación al año pasado"), responde con intent "query_comparison" y extrae month, year, compare_year (año de comparación).
+- Si el usuario pregunta por resumen, balance, gastos con comparación entre períodos (ej: "en comparación al año pasado", "comparar con el mes anterior", "vs el anterior"), responde con intent "query_comparison" y extrae month, year, compare_month, compare_year. IMPORTANTE: Si dice "mes anterior" o "el anterior", calcular correctamente el mes inmediatamente previo (ver reglas de REFERENCIAS TEMPORALES arriba). Si pregunta por categoría específica (ej: "en comida"), extraer category también.
 - Si el usuario pregunta por resumen, balance, gastos altos, recurrentes SIN comparación, responde con intent "query_summary" o "query_top_expenses" según corresponda.
 - Si el usuario pregunta por categorización, responde con intent "categorize".
 
@@ -512,6 +544,9 @@ EJEMPLOS:
 - "¿Cuáles fueron mis mayores gastos?" → {"intent": "query_top_expenses", "confidence": 0.99, "entities": {}}
 - "Quiero ahorrar 100000 para vacaciones" → {"intent": "create_goal", "confidence": 0.99, "entities": {"amount": 100000, "currency": "ARS", "goalName": "vacaciones", "categories": ["vacaciones", "viajes"]}}
 - "Nueva cuenta de efectivo en dolares" → {"intent": "create_account", "confidence": 0.99, "entities": {"name": "Efectivo USD", "type": "cash", "currency": "USD"}}
+- "Compará este mes vs el anterior" → {"intent": "query_comparison", "confidence": 0.99, "entities": {"month": ${currentMonth}, "year": ${currentYear}, "compare_month": ${currentMonth === 1 ? 12 : currentMonth - 1}, "compare_year": ${currentMonth === 1 ? lastYear : currentYear}}}
+- "Compará este mes vs el anterior en comida" → {"intent": "query_comparison", "confidence": 0.99, "entities": {"month": ${currentMonth}, "year": ${currentYear}, "compare_month": ${currentMonth === 1 ? 12 : currentMonth - 1}, "compare_year": ${currentMonth === 1 ? lastYear : currentYear}, "category": "comida"}}
+- "Gastos de enero vs diciembre" → {"intent": "query_comparison", "confidence": 0.99, "entities": {"month": 1, "year": ${currentYear}, "compare_month": 12, "compare_year": ${lastYear}}}
 
 Mensaje: "${message}"`;
 
