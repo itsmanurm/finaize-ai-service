@@ -432,7 +432,7 @@ ENTIDADES A EXTRAER SEGÚN EL INTENT:
 - Para presupuestos - CONSULTAR (check_budget): category, month, year, amount (si pregunta si puede gastar X). (Ej: "PUEDO gastar?", "Me alcanza?", "Cómo voy?")
 - Para metas: amount, currency, description, goalName, categories (array de strings), deadline (fecha límite si se menciona), year, month
 - Para cuentas: name (IMPORTANTE: extraer el nombre específico del banco o institución mencionada, NO "nueva cuenta" ni palabras genéricas. Ej: "banco nacion", "Galicia", "BBVA", "Efectivo"), type ("cash", "bank", "card", "investment"), currency, primary, reconciled, archived
-- Para categorías: name, type ("income" o "expense"), icon, color, budgetLimit
+- Para categorías: name, type ("income" o "expense"), icon, color
 
 IMPORTANTE - MONTOS Y FORMATO ARGENTINO:
 - Extraer solo el número del monto, sin puntos ni comas
@@ -516,7 +516,7 @@ REGLAS ADICIONALES:
 - Si el usuario expresa un deseo de COMPRAR o AHORRAR PARA algo específico ("quiero ahorrar", "meta de", "objetivo de"), responde con intent "create_goal" y extrae amount, currency, description, goalName, categories (array de categorías), deadline (si se menciona), year, month.
 - Si el usuario menciona que YA AHORRÓ o AGREGÓ dinero a una meta existente (ej: "ahorré", "guardé", "puse", "agregué"), responde con intent "add_contribution" y extrae amount, goalName (nombre de la meta), description.
 - Si el usuario menciona crear una cuenta bancaria o billetera, responde con intent "create_account" y extrae name, type, currency, primary (falso por defecto), reconciled (falso por defecto), archived (falso por defecto).
-- Si el usuario menciona crear una categoría nueva, responde con intent "create_category" y extrae name, type ("income" o "expense"), icon, color, budgetLimit.
+- Si el usuario menciona crear una categoría nueva, responde con intent "create_category" y extrae name, type ("income" o "expense"), icon, color.
 - Si el usuario menciona invertir, comprar activos CON monto específico, responde con intent "invest" y extrae activo, amount, currency, periodo, tipo.
 - Si el usuario menciona GASTOS, pagos, compras, retiros, extracciones, transferencias a terceros (ej: "gasté", "pagué", "compré", "saqué plata", "retiré", "extraje", "me cobraron", "salió", "salieron", "compro", "pago", "transferí a [persona/comercio]"), responde con intent "add_expense" y extrae amount, currency ('ARS' o 'USD'), merchant, category, description, year, month, day, account, paymentMethod (usar referencias temporales de arriba). 
 - REGLA CRÍTICA MERCHANT: NUNCA extraigas artículos ("un", "una", "el", "la", "unos", "unas") como merchant. Si el usuario dice "gasté 100 en un café", merchant debe ser "café" o estar vacío, NUNCA "un". 
