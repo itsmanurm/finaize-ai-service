@@ -10,6 +10,7 @@ export interface ForecastResult {
     trend: 'up' | 'down' | 'stable';
     slopeDaily: number;
     slopeMonthly: number;
+    slope?: number; // Legacy support for tests
     stabilityLevel: 'high' | 'medium' | 'low';
     rSquared: number;
     predictions: DataPoint[];
@@ -205,12 +206,19 @@ export class ForecastingService {
      * Mantenemos este helper para el gráfico de "Acumulado Real".
      */
     static calculateMovingAverage(data: DataPoint[], windowSize: number = 3): DataPoint[] {
-        if (data.length < windowSize) return data; // Return raw if too small
-        // ... (existing logic logic optimized) ...
+        if (data.length < windowSize) return data;
         const sorted = [...data].sort((a, b) => a.date.getTime() - b.date.getTime());
-        // Simple Accumulation for Charting Real Data usually doesn't need MA on the Accumulate Line itself if it is daily points.
-        // But if user wants smoothed line:
-        return sorted; // For V2, returning sorted raw is safer for "Real Accumulate" line.
+        const result: DataPoint[] = [];
+
+        for (let i = 0; i <= sorted.length - windowSize; i++) {
+            const window = sorted.slice(i, i + windowSize);
+            const avg = window.reduce((sum, d) => sum + d.value, 0) / windowSize;
+            result.push({
+                date: window[window.length - 1].date,
+                value: avg
+            });
+        }
+        return result;
     }
 
     /**
@@ -267,6 +275,50 @@ export class ForecastingService {
             explanation: "Estimación rápida (Legacy)",
             confidenceNote: "Modo simple",
             movingAverage: cumulativeReal // Added back for agent.ts
+        };
+    }
+
+    /**
+     * Predicción lineal pura (Legacy para tests)
+     */
+    static predictLinear(data: DataPoint[], forecastDays: number = 30): ForecastResult {
+        if (data.length < 2) return this.getEmptyForecast("Insuficientes datos para predecir");
+
+        const sorted = [...data].sort((a, b) => a.date.getTime() - b.date.getTime());
+        const startDate = sorted[0].date.getTime();
+        const oneDay = 24 * 60 * 60 * 1000;
+
+        const regData: [number, number][] = sorted.map(d => [
+            (d.date.getTime() - startDate) / oneDay,
+            d.value
+        ]);
+
+        const mb = ss.linearRegression(regData);
+        const line = ss.linearRegressionLine(mb);
+
+        const predictions: DataPoint[] = [];
+        const lastDate = sorted[sorted.length - 1].date;
+
+        for (let i = 1; i <= forecastDays; i++) {
+            const nextDate = new Date(lastDate.getTime() + (i * oneDay));
+            predictions.push({
+                date: nextDate,
+                value: line((nextDate.getTime() - startDate) / oneDay)
+            });
+        }
+
+        return {
+            modelVersion: "v2-adaptive",
+            trend: mb.m > 0 ? 'up' : (mb.m < 0 ? 'down' : 'stable'),
+            slopeDaily: mb.m,
+            slopeMonthly: mb.m * 30,
+            slope: mb.m, // Alias para tests
+            stabilityLevel: 'medium',
+            rSquared: ss.rSquared(regData, line),
+            predictions,
+            explanation: "Proyección lineal simple",
+            confidenceNote: "Basado en tendencia histórica",
+            alerts: []
         };
     }
 }

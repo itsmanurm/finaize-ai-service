@@ -46,6 +46,7 @@ interface OpenAICategorizationInput {
   merchant?: string;
   amount: number;
   currency: 'ARS' | 'USD';
+  transactionType?: 'ingreso' | 'egreso' | 'transferencia';
   context?: {
     recentTransactions?: Array<{
       description: string;
@@ -118,7 +119,13 @@ const CATEGORIES = [
 function createPrompt(input: OpenAICategorizationInput): string {
   const { description, merchant, amount, currency, context } = input;
 
-  const amountType = amount < 0 ? 'expense' : 'income';
+  let amountType = 'expense';
+  if (input.transactionType) {
+    amountType = input.transactionType === 'ingreso' ? 'income' : 'expense';
+  } else {
+    amountType = amount < 0 ? 'expense' : 'income';
+  }
+
   const formattedAmount = `${currency} ${Math.abs(amount).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
 
   // Prompt optimized for GPT-4o-mini
@@ -136,10 +143,11 @@ ${CATEGORIES.map(cat => `- ${cat}`).join('\n')}
 
 **DIRECTRICES EXCLUSIVAS:**
 1. **Contexto Local:** Reconoce marcas, abreviaturas y servicios de Argentina (ej. "MP", "Coto", "Afip", "Sube").
-2. **Coherencia de Monto:** Un gasto negativo NO puede ser "Ingresos" ni "Salarios".
-3. **Ingresos:** Solo clasifica como "Ingresos", "Salarios", "Transferencias" o "Inversiones" si el monto es positivo.
+2. **Coherencia de Tipo:** Si la transacción está marcada como "${amountType}", la categoría debe ser coherente con ese flujo.
+3. **Restricciones:** Un gasto no puede ser "Salarios". Un ingreso no puede ser "Cargos bancarios".
 4. **Confianza:** Asigna un score (0.0 - 1.0). Sé conservador si la descripción es ambigua (ej. "Transferencia").
-5. **Razonamiento:** Breve y conciso.`;
+5. **Objetos y Hogar:** Si la descripción menciona objetos físicos del hogar (ej. "mate", "tabla", "tornillos", "foco"), prefiere "Ferretería y hogar" o "Compras" en lugar de "Servicios".
+6. **Razonamiento:** Breve y conciso.`;
 
   // Context Injection
   if (context?.recentTransactions && context.recentTransactions.length > 0) {

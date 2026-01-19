@@ -6,9 +6,16 @@ export const ItemSchema = z.object({
   amount: z.number(),
   currency: z.enum(['ARS', 'USD']),
   when: z.string().optional(),
-  accountLast4: z.string().optional(),
-  bankMessageId: z.string().optional(),
+  account: z.string().optional(),
+  paymentMethod: z.enum(['credito', 'debito', 'efectivo', 'transferencia']).optional(),
+  transactionType: z.enum(['ingreso', 'egreso', 'transferencia']).optional(),
   category: z.string().optional(),
+  creditDetails: z.object({
+    installments: z.number().optional(),
+    interestRate: z.number().optional(),
+    firstInstallmentDate: z.string().optional(),
+    cardName: z.string().optional()
+  }).optional(),
   previousTransactions: z.array(z.object({
     description: z.string(),
     amount: z.number(),
@@ -45,11 +52,23 @@ export const TransactionSchema = z.object({
   _id: z.string().optional(),
   id: z.string().optional(),
   amount: z.number(),
-  date: z.union([z.string(), z.date()]).optional(),
-  when: z.union([z.string(), z.date()]).optional(), // Alias común en el proyecto
+  when: z.union([z.string(), z.date()]).optional(),
   description: z.string().optional(),
   category: z.string().optional(),
-  merchant: z.string().optional()
+  account: z.string().optional(),
+  transactionType: z.enum(['ingreso', 'egreso', 'transferencia']).optional(),
+  paymentMethod: z.enum(['credito', 'debito', 'efectivo', 'transferencia']).optional(),
+  ai: z.object({
+    predicted: z.string().optional(),
+    confidence: z.number().optional(),
+    reviewRequired: z.boolean().optional(),
+    generated: z.boolean().optional(),
+    intent: z.string().optional(),
+    merchant: z.string().optional(),
+    dedupHash: z.string().optional()
+  }).optional(),
+  confirmed: z.boolean().optional(),
+  isInternalTransfer: z.boolean().optional()
 });
 export type TransactionInput = z.infer<typeof TransactionSchema>;
 

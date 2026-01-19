@@ -109,7 +109,9 @@ r.post('/summarize', async (req, res) => {
   const byMerchant = new Map<string, number>();
 
   for (const it of enriched) {
-    if (it.amount >= 0) totalIncome += it.amount;
+    const isIncome = (it as any).transactionType === 'ingreso' || (!(it as any).transactionType && it.amount >= 0);
+
+    if (isIncome) totalIncome += it.amount;
     else totalExpense += it.amount;
 
     byCategory.set(it.category, (byCategory.get(it.category) ?? 0) + it.amount);
@@ -252,7 +254,7 @@ r.post('/forecast', async (req, res) => {
     const currentPointsMap = new Map<string, number>();
 
     for (const t of filtered) {
-      const d = t.date || t.when;
+      const d = (t as any).date || t.when;
       if (!d) continue;
       const dateObj = typeof d === 'string' ? new Date(d) : d;
       if (isNaN(dateObj.getTime())) continue;

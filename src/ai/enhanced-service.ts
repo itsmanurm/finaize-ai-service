@@ -16,6 +16,7 @@ export interface CategorizeInput {
   when?: string;
   accountLast4?: string;
   bankMessageId?: string;
+  transactionType?: 'ingreso' | 'egreso' | 'transferencia';
   useAI?: boolean;
 
   // Contexto para IA
@@ -211,8 +212,9 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
     if (conf >= minConf) {
       category = (rule as any).category;
     } else {
-      // Si la regla tuvo hit pero la confianza es baja, usar fallback basado en monto
-      const isExpense = Number(input.amount) < 0;
+      // Si la regla tuvo hit pero la confianza es baja, usar fallback basado en el tipo
+      const isExpense = input.transactionType === 'egreso' || (Number(input.amount) < 0 && !input.transactionType);
+      // Nota: Si no hay transactionType, asumimos egreso por defecto para montos positivos (comportamiento estándar)
       category = isExpense ? 'Sin clasificar' : 'Ingresos';
     }
     result = {
@@ -224,15 +226,11 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
       aiEnhanced: false
     };
   } else {
-    const isExpense = Number(input.amount) < 0;
-    const defaultCat = isExpense ? 'Sin clasificar' : 'Ingresos';
+    const isExpense = input.transactionType === 'egreso' || (Number(input.amount) < 0 && !input.transactionType);
+
     console.log('DEBUG: Categorize Input:', JSON.stringify(input, null, 2));
     console.log('DEBUG: Rule Match:', JSON.stringify(rule, null, 2));
     console.log('DEBUG: AI Confidence Threshold:', minConf);
-    console.log('DEBUG: Fallback Logic:', {
-      isExpense,
-      defaultCat
-    });
     // Fallback inteligente
     const fallbackCategory = isExpense ? 'Sin clasificar' : 'Ingresos';
     result = {

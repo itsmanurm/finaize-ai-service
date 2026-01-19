@@ -47,14 +47,14 @@ export async function actionQueryDollar() {
     // URL del backend - usar variable de entorno o fallback
     const backendUrl = process.env.FINAIZE_BACKEND_URL || 'http://localhost:3001';
     const response = await fetch(`${backendUrl}/api/investments/market/exchange-rates`);
-    
+
     if (!response.ok) {
       console.error('[actionQueryDollar] Backend error:', response.status);
       return { ok: false, error: 'Error al obtener cotizaciones', rates: [] };
     }
-    
+
     const rates = await response.json();
-    
+
     // Formatear las cotizaciones para respuesta amigable
     const formattedRates = rates.map((r: any) => ({
       nombre: r.nombre || r.casa || r.moneda,
@@ -62,9 +62,9 @@ export async function actionQueryDollar() {
       venta: r.venta,
       fechaActualizacion: r.fechaActualizacion
     }));
-    
-    return { 
-      ok: true, 
+
+    return {
+      ok: true,
       rates: formattedRates,
       timestamp: new Date().toISOString()
     };
@@ -103,21 +103,21 @@ export async function queryTopExpenses(payload: { year?: number; month?: number 
   if (payload?.year) {
     const yearStr = payload.year.toString();
     filtered = filtered.filter((it: any) => {
-      const d = it.date || it.ts;
+      const d = it.when || it.date || it.ts;
       return d && d.startsWith(yearStr);
     });
   }
   if (payload?.month) {
     const monthNum = payload.month;
     filtered = filtered.filter((it: any) => {
-      const d = it.date || it.ts;
+      const d = it.when || it.date || it.ts;
       const m = d ? Number(d.split('-')[1]) : null;
       return m === monthNum;
     });
   }
 
-  // Solo gastos (monto positivo)
-  filtered = filtered.filter((it: any) => Number(it.amount) > 0);
+  // Solo gastos
+  filtered = filtered.filter((it: any) => it.transactionType === 'egreso' || (Number(it.amount) > 0 && !it.transactionType));
   // Ordenar por monto descendente y tomar top 3
   const top = filtered.sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0)).slice(0, 3);
   return {
@@ -160,19 +160,19 @@ async function getAccounts(token?: string) {
 
 export async function actionAddExpense(payload: { amount: number; currency?: string; merchant?: string; description?: string; when?: string; account?: string; paymentMethod?: string; token?: string }, persist = true) {
   const { amount, currency = 'ARS', merchant, description, when, paymentMethod, token } = payload;
-  
+
   // Resolve account based on currency and keywords
   let account = payload.account || 'Efectivo';
-  
+
   // Normalize account name to lowercase for comparison
   const accountLower = (account || '').toLowerCase().trim();
-  
+
   // Smart account resolution based on keywords first (overrides default currency if needed)
   if (accountLower.includes('dolar') || accountLower.includes('usd') || accountLower.includes('verde')) {
-     account = 'Efectivo USD';
-     // Implicitly correct currency if needed, though strictly we stick to payload currency unless we want to auto-fix it too
+    account = 'Efectivo USD';
+    // Implicitly correct currency if needed, though strictly we stick to payload currency unless we want to auto-fix it too
   } else if (accountLower.includes('peso') || accountLower.includes('ars')) {
-     account = 'Efectivo';
+    account = 'Efectivo';
   } else if (currency === 'USD') {
     // If currency is USD and account is generic or empty, default to Efectivo USD
     if (accountLower === 'efectivo' || !accountLower) {
@@ -217,16 +217,24 @@ export async function actionAddExpense(payload: { amount: number; currency?: str
   }
 
   const record = {
-    ts: timestamp,
-    amount,
+    when: timestamp,
+    amount: Math.abs(amount),
     currency,
-    merchant: merchant || '',
     description: description || '',
     category: categorized.category,
-    account: account, 
-    paymentMethod: paymentMethod || 'efectivo',
-    confidence: categorized.confidence,
-    dedupHash: categorized.dedupHash
+    account: account,
+    transactionType: 'egreso' as const,
+    paymentMethod: (paymentMethod || 'efectivo') as any,
+    ai: {
+      predicted: categorized.category,
+      confidence: categorized.confidence,
+      reviewRequired: categorized.confidence < 0.8,
+      generated: true,
+      intent: 'add_expense',
+      merchant: merchant || categorized.merchant_clean || '',
+      dedupHash: categorized.dedupHash
+    },
+    confirmed: false
   };
 
   if (persist) {
@@ -242,19 +250,19 @@ export async function actionAddExpense(payload: { amount: number; currency?: str
 
 export async function actionAddIncome(payload: { amount: number; currency?: string; source?: string; description?: string; when?: string; account?: string; category?: string; token?: string }, persist = true) {
   const { amount, currency = 'ARS', source, description, when, token } = payload;
-  
+
   // Resolve account based on currency and keywords (same logic as expenses)
   let account = payload.account || 'Efectivo';
-  
+
   // Normalize account name to lowercase for comparison
   const accountLower = (account || '').toLowerCase().trim();
-  
+
   // Smart account resolution based on keywords first (overrides default currency if needed)
   if (accountLower.includes('dolar') || accountLower.includes('usd') || accountLower.includes('verde')) {
-     account = 'Efectivo USD';
-     // Implicitly correct currency if needed, though strictly we stick to payload currency unless we want to auto-fix it too
+    account = 'Efectivo USD';
+    // Implicitly correct currency if needed, though strictly we stick to payload currency unless we want to auto-fix it too
   } else if (accountLower.includes('peso') || accountLower.includes('ars')) {
-     account = 'Efectivo';
+    account = 'Efectivo';
   } else if (currency === 'USD') {
     // If currency is USD and account is generic or empty, default to Efectivo USD
     if (accountLower === 'efectivo' || !accountLower) {
@@ -295,17 +303,26 @@ export async function actionAddIncome(payload: { amount: number; currency?: stri
   }
 
   const record = {
-    ts: timestamp,
-    amount: -Math.abs(amount), // Ingresos son negativos en el sistema
+    when: timestamp,
+    amount: Math.abs(amount),
     currency,
-    source: source || '',
     description: description || source || 'Ingreso',
     category: payload.category || 'Ingreso',
     account: account,
-    paymentMethod: 'transferencia',
-    confidence: 1.0,
-    dedupHash: `income_${timestamp}_${amount}_${currency}`
+    transactionType: 'ingreso' as const,
+    paymentMethod: 'transferencia' as const,
+    ai: {
+      predicted: payload.category || 'Ingreso',
+      confidence: 1.0,
+      reviewRequired: false,
+      generated: true,
+      intent: 'add_income',
+      merchant: source || '',
+      dedupHash: `income_${timestamp}_${amount}_${currency}`
+    },
+    confirmed: false
   };
+
 
   if (persist) {
     try {
@@ -352,14 +369,14 @@ export async function actionQuerySummary(payload: { items?: any[]; classifyMissi
   if (payload.year) {
     const yearStr = payload.year.toString();
     filtered = filtered.filter((it: any) => {
-      const d = it.date || it.ts;
+      const d = it.when || it.date || it.ts;
       return d && d.startsWith(yearStr);
     });
   }
   if (payload.month) {
     const monthNum = payload.month;
     filtered = filtered.filter((it: any) => {
-      const d = it.date || it.ts;
+      const d = it.when || it.date || it.ts;
       const m = d ? Number(d.split('-')[1]) : null;
       return m === monthNum;
     });
@@ -373,8 +390,11 @@ export async function actionQuerySummary(payload: { items?: any[]; classifyMissi
       .reduce((acc, it) => acc + (Number(it.amount) || 0), 0);
   } else {
     for (const it of filtered) {
-      if (it.amount >= 0) totalIncome += it.amount;
-      else totalExpense += it.amount;
+      const isIncome = it.transactionType === 'ingreso' || (it.amount < 0 && !it.transactionType);
+      const isExpense = it.transactionType === 'egreso' || (it.amount > 0 && !it.transactionType);
+
+      if (isIncome) totalIncome += Math.abs(it.amount);
+      else if (isExpense) totalExpense += Math.abs(it.amount);
     }
   }
   return {

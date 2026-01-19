@@ -8,7 +8,8 @@ export interface Transaction {
   type: 'income' | 'expense';
   category: string;
   merchant?: string;
-  date: string;
+  date?: string;
+  when?: string;
   account?: string;
   paymentMethod?: string;
 }
@@ -153,7 +154,7 @@ export function analyzeFinancialProfile(input: FinancialProfileInput): Financial
   const habits = analyzeHabits(transactions, budgets, goals, avgMonthlyIncome);
 
   // Analizar cumplimiento de presupuestos (si tiene presupuestos activos)
-  const budgetCompliance = budgets.length > 0 
+  const budgetCompliance = budgets.length > 0
     ? analyzeBudgetCompliance(budgets, expenses, timeframeMonths)
     : undefined;
 
@@ -252,7 +253,9 @@ function detectSpendingPatterns(expenses: Transaction[]): FinancialProfile['patt
   // Análisis temporal: ¿cuándo gasta más?
   const byDayOfMonth = new Map<number, number>();
   expenses.forEach(t => {
-    const day = new Date(t.date).getDate();
+    const d = t.when || t.date;
+    if (!d) return;
+    const day = new Date(d).getDate();
     byDayOfMonth.set(day, (byDayOfMonth.get(day) || 0) + Math.abs(t.amount));
   });
 
@@ -339,7 +342,7 @@ function analyzeBudgetCompliance(
 ): BudgetCompliance {
   // Filtrar presupuestos no archivados (activos)
   const activeBudgets = budgets.filter(b => !b.archived);
-  
+
   if (activeBudgets.length === 0) {
     return {
       totalBudgets: budgets.length,
@@ -358,13 +361,15 @@ function analyzeBudgetCompliance(
   const categoryUsage = new Map<string, { budget: Budget; spent: number }>();
 
   activeBudgets.forEach(budget => {
-    const categories = budget.categories && budget.categories.length > 0 
-      ? budget.categories 
+    const categories = budget.categories && budget.categories.length > 0
+      ? budget.categories
       : [budget.category];
 
     // Filtrar transacciones del mes/año del presupuesto
     const budgetExpenses = expenses.filter(t => {
-      const date = new Date(t.date);
+      const d = t.when || t.date;
+      if (!d) return false;
+      const date = new Date(d);
       const expenseMonth = date.getMonth() + 1;
       const expenseYear = date.getFullYear();
       return expenseMonth === budget.month && expenseYear === budget.year && categories.includes(t.category);
@@ -393,7 +398,7 @@ function analyzeBudgetCompliance(
         budgetAmount: budget.amount,
         actualSpent: Math.round(spent),
         usagePercent: Math.round(usagePercent),
-        suggestion: usagePercent >= 150 
+        suggestion: usagePercent >= 150
           ? 'Exceso crítico: considera revisar tus hábitos de gasto en esta categoría'
           : 'Presupuesto excedido: ajusta el monto o reduce gastos el próximo mes'
       });
@@ -404,12 +409,12 @@ function analyzeBudgetCompliance(
     }
   });
 
-  const avgUsagePercent = categoryUsage.size > 0 
-    ? totalUsagePercent / categoryUsage.size 
+  const avgUsagePercent = categoryUsage.size > 0
+    ? totalUsagePercent / categoryUsage.size
     : 0;
 
-  const complianceRate = categoryUsage.size > 0 
-    ? ((categoryUsage.size - exceededCount) / categoryUsage.size) * 100 
+  const complianceRate = categoryUsage.size > 0
+    ? ((categoryUsage.size - exceededCount) / categoryUsage.size) * 100
     : 0;
 
   // Calcular compliance score (0-100)
@@ -453,10 +458,11 @@ function analyzeHabits(
   const expenses = transactions.filter(t => t.type === 'expense');
 
   // Consistencia de tracking: ¿registra transacciones regularmente?
-  const datesSet = new Set(transactions.map(t => t.date.split('T')[0]));
+  const datesSet = new Set(transactions.map(t => (t.when || t.date || '').toString().split('T')[0]).filter(Boolean));
   const uniqueDays = datesSet.size;
-  const daysSinceFirst = transactions.length > 0
-    ? Math.ceil((new Date().getTime() - new Date(transactions[0].date).getTime()) / (1000 * 60 * 60 * 24))
+  const firstDate = transactions.length > 0 ? (transactions[0].when || transactions[0].date) : null;
+  const daysSinceFirst = firstDate
+    ? Math.max(1, Math.ceil((new Date().getTime() - new Date(firstDate).getTime()) / (1000 * 60 * 60 * 24)))
     : 1;
   const trackingConsistency = Math.min(100, Math.round((uniqueDays / daysSinceFirst) * 100 * 3));
 

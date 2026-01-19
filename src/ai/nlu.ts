@@ -19,7 +19,13 @@ export type Entities = {
   tipo?: 'mejores' | 'subiendo' | 'recomendación' | 'inusual' | 'reducible' | 'conveniencia' | 'recurrente' | string;
   activo?: 'cedear' | 'criptomoneda' | 'acción' | 'fondo común de inversión' | string;
   account?: string;
-  paymentMethod?: string;
+  paymentMethod?: 'credito' | 'debito' | 'efectivo' | 'transferencia' | string;
+  creditDetails?: {
+    installments: number;
+    interestRate?: number;
+    firstInstallmentDate?: string;
+    cardName?: string;
+  };
   source?: string;
   goalName?: string;
   items?: any[];
@@ -51,6 +57,12 @@ function logNLU(level: 'info' | 'warn' | 'error', msg: string, data?: any) {
 // Reglas simples y deterministas para intents comunes
 // Ordenadas por especificidad (más específicas primero)
 const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
+  // Info de mercado (CEDEARs, Cripto, Acciones) - Prioridad alta
+  { name: 'query_market_info', re: /\b(cedear|criptomonedas?|btc|bitcoin|eth|ethereum|acciones|invertir en|mejores inveri|qué activo|qué recomiend|bolsa de valore)\b/i },
+
+  // Cotización dólar
+  { name: 'query_dollar_rate', re: /\b(d[oó]lar|cotizaci[oó]n|precio del d[oó]lar|blue|mep|ccl|contado con liquidaci[oó]n|tipo de cambio|cu[aá]nto est[aá] el d[oó]lar|valor del d[oó]lar|d[oó]lar hoy|d[oó]lar actual)\b/i },
+
   // Análisis de perfil
   { name: 'analyze_financial_profile', re: /\b(mi perfil|perfil financiero|analiza mi comportamiento|cómo gasto|cómo es mi gasto|mis hábitos de gasto|mi salud financiera|qué tipo de gastador|mi situación financiera|análisis de mis|estudia mi patrón)\b/i },
 
@@ -67,11 +79,10 @@ const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
   { name: 'query_summary', re: /\b(desde que|en los últimos|últimos \d+ (días|meses)).*gast/i },
 
   // Gastos/ingresos
-  { name: 'add_expense', re: /\b(gasté|gaste|gastó|pagué|pague|pagó|compré|compre|compró|saqué|saque|sacó|retiré|retire|retiró|extraje|me cobraron|me cobró|me descontaron|salió|salieron|gasto|pago|compro|saco|retiro|registrar gasto|agregar gasto|anotar gasto)\b/i },
+  { name: 'add_expense', re: /\b(gasté|gaste|gastó|pagué|pague|pagó|compré|compre|compró|saqué|saque|sacó|retiré|retire|retiró|extraje|me cobraron|me cobró|me descontaron|salió|salieron|gasto|pago|compro|saco|retiro|registrar gasto|agregar gasto|anotar gasto|transferí(?! a mi))\b/i },
   { name: 'add_income', re: /\b(gané|gane|ganó|cobré|cobre|cobró|recibí|recibe|recibió|me pagaron|me pagó|me ingresó|me ingresaron|me acreditaron|me acreditó|me depositaron|me depositó|ingreso|ingresos|percibí|percibe|percibió|sueldo|salario|cargué|cargue|cargó|cargar|deposité|deposite|depositó|depositar|transferí a mi|me transfirieron|me transferí)\b/i },
 
-  // Presupuestos (Creación vs Consulta)
-  // Consulta (Check) - Prioridad alta para capturar preguntas "puedo gastar"
+  // Presupuestos
   { name: 'check_budget', re: /\b(puedo gastar|me alcanza|tengo presupuesto|presupuesto disponible|cuánto me queda|cómo voy con|estado de|situación de).*(presupuesto|gasto|categoría|para)\b/i },
   { name: 'check_budget', re: /\b(puedo comprar|me da el cuero|llego a fin de mes)\b/i },
 
@@ -89,13 +100,7 @@ const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
   { name: 'categorize', re: /\b(categorizar|clasificar)\b/i },
 
   // Educación financiera
-  { name: 'general_knowledge', re: /\b(cómo|cómo hago|cómo puedo|qué es|cuál es|enseña|explica|tips?|consejos?|aprende?|estrategia)\b.*\b(ahorr|presupuest|deud|inversi[óo]n|ahorro|cripto|finanz|dinero|gasto)\b/i },
-
-  // Análisis de perfil (alto peso)
-  { name: 'analyze_financial_profile', re: /analizar.*perfil/i },
-
-  // Consulta de dólar
-  { name: 'query_dollar_rate', re: /\b(d[oó]lar|cotizaci[oó]n|precio del d[oó]lar|blue|mep|ccl|contado con liquidaci[oó]n|tipo de cambio|cu[aá]nto est[aá] el d[oó]lar|valor del d[oó]lar|d[oó]lar hoy|d[oó]lar actual)\b/i },
+  { name: 'general_knowledge', re: /\b(cómo|cómo hago|cómo puedo|qué es|enseña|explica|tips?|consejos?|aprende?|estrategia)\b.*\b(ahorr|presupuest|deud|finanz|dinero|gasto)\b/i },
 ];
 
 export async function parseMessage(message: string): Promise<NLUResult> {
@@ -164,18 +169,18 @@ export async function parseMessage(message: string): Promise<NLUResult> {
     entities.month = now.getMonth() + 1;
     entities.year = now.getFullYear();
   }
-  
+
   // CRÍTICO: Detectar comparaciones con "mes anterior" o "el anterior"
   // Esto debe procesarse ANTES de OpenAI para garantizar la correcta interpretación
   if (/(compar|vs\.?|versus|frente a).*(mes\s+)?anterior|anterior.*mes/i.test(message)) {
     const now = getArgentinaDate();
     const currentMonth = now.getMonth() + 1; // 1-12
     const currentYear = now.getFullYear();
-    
+
     // Establecer período actual (este mes)
     entities.month = currentMonth;
     entities.year = currentYear;
-    
+
     // Calcular mes anterior cronológicamente
     if (currentMonth === 1) {
       // Si estamos en enero, el mes anterior es diciembre del año pasado
@@ -186,10 +191,10 @@ export async function parseMessage(message: string): Promise<NLUResult> {
       entities.compare_month = currentMonth - 1;
       entities.compare_year = currentYear;
     }
-    
+
     logNLU('info', `Comparación detectada: ${entities.month}/${entities.year} vs ${entities.compare_month}/${entities.compare_year}`);
   }
-  
+
   // Si el mensaje contiene 'transferí', asignar categoría transferencia
   if (/transfer[ií]/i.test(message)) {
     entities.category = 'transferencia';
@@ -244,6 +249,24 @@ export async function parseMessage(message: string): Promise<NLUResult> {
   if (!category) {
     const categoryMatch = message.match(/categor[ií]a\s+([A-Za-z0-9\sáéíóúüñ\-]+)/i);
     if (categoryMatch) category = categoryMatch[1].trim();
+  }
+
+  // Extracción de entidades para información de mercado (CEDEARs, Cripto, Acciones)
+  const marketActiveMatch = message.match(/\b(cedears?|criptomonedas?|btc|bitcoin|eth|ethereum|acciones?)\b/i);
+  if (marketActiveMatch) {
+    const a = marketActiveMatch[1].toLowerCase();
+    entities.activo = a; // normalizeEntities se encarga de la normalización final
+  }
+
+  const marketTypeMatch = message.match(/\b(mejores|subiendo|recomendaci[óo]n|recomendame|suben|mejor|recomienda)\b/i);
+  if (marketTypeMatch) {
+    const t = marketTypeMatch[1].toLowerCase();
+    entities.tipo = t;
+  }
+
+  const marketPeriodMatch = message.match(/\b(hoy|semana|mes|año)\b/i);
+  if (marketPeriodMatch) {
+    entities.period = marketPeriodMatch[1].toLowerCase();
   }
 
   if (merchant) entities.merchant = merchant;
@@ -381,7 +404,7 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
   // intent detection via rules
 
   // Para intents de "acción directa" que no necesitan OpenAI, retornar inmediatamente
-  const DIRECT_ACTION_INTENTS = ['query_dollar_rate'];
+  const DIRECT_ACTION_INTENTS = ['query_dollar_rate', 'query_market_info', 'analyze_financial_profile', 'query_top_expenses'];
   if (matchedIntent && DIRECT_ACTION_INTENTS.includes(matchedIntent)) {
     logNLU('info', `Direct action intent detected, skipping OpenAI: ${matchedIntent}`);
     return { intent: matchedIntent, confidence: 0.95, entities: normalizeEntities(entities) };
@@ -404,7 +427,7 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
     const prompt = `Eres un parser de intención financiera experto. Tu tarea es identificar el intent y extraer entidades del mensaje. Responde SOLO JSON con las keys: intent, confidence, entities. Siempre responde en español.
 
 ENTIDADES A EXTRAER SEGÚN EL INTENT:
-- Para gastos/ingresos: amount, currency, merchant, category, description, year, month, day, account (ej: "Efectivo", "Banco", "Tarjeta"), paymentMethod ("efectivo", "debito", "credito")
+- Para gastos/ingresos: amount, currency, merchant, category, description, year, month, day, account (ej: "Efectivo", "Banco", "Tarjeta"), paymentMethod ("efectivo", "debito", "credito", "transferencia"), creditDetails (solo para gastos: installments, interestRate)
 - Para presupuestos - CREAR (create_budget): category, month, year, amount, currency, operation ("set" para fijar/crear, "add" para agregar/aumentar). (Ej: "QUIERO gastar 300" -> set, "AGREGAR 300 al presupuesto" -> add)
 - Para presupuestos - CONSULTAR (check_budget): category, month, year, amount (si pregunta si puede gastar X). (Ej: "PUEDO gastar?", "Me alcanza?", "Cómo voy?")
 - Para metas: amount, currency, description, goalName, categories (array de strings), deadline (fecha límite si se menciona), year, month
@@ -446,10 +469,15 @@ IMPORTANTE - REFERENCIAS TEMPORALES (HOY es ${now.getDate()}/${currentMonth}/${c
   * SIEMPRE incluir day, month y year en entities para add_expense y add_income (no dejar ninguno vacío)
 - IMPORTANTE: Si all_time es true, NO incluir year ni month en entities
 
-IMPORTANTE - MÉTODO DE PAGO:
+IMPORTANTE - MÉTODO DE PAGO Y CUOTAS:
 - Si menciona "tarjeta", "con tarjeta", "pagué con débito": paymentMethod: "debito"
-- Si menciona "crédito", "en cuotas", "con visa": paymentMethod: "credito"
+- Si menciona "crédito", "en cuotas", "con visa", "con mastercard": paymentMethod: "credito"
 - Si menciona "efectivo", "cash", "en mano": paymentMethod: "efectivo"
+- Si menciona "transferencia", "transferí", "me transfirieron": paymentMethod: "transferencia"
+- Si menciona "cuotas" o "pagos" (ej: "en 3 cuotas", "12 pagos"):
+  * Establecer paymentMethod: "credito"
+  * Dentro de creditDetails, extraer installments (el número de cuotas)
+  * Si menciona interés (ej: "10% de interés"), extraer interestRate: 10
 - Si no se especifica: paymentMethod: "efectivo" (default)
 
 IMPORTANTE - CUENTA:
@@ -478,9 +506,10 @@ IMPORTANTE - DEADLINES PARA METAS:
 - Si no se especifica deadline: no incluir el campo
 
 REGLAS ADICIONALES:
-- Si el usuario hace preguntas generales sobre cómo ahorrar, invertir, comprar activos, consejos financieros, educación financiera, SIN mencionar montos específicos, responde con intent "general_knowledge" y extrae topic (ej: ahorro, inversión, presupuesto, deudas, criptomonedas, etc).
-- Si el usuario pregunta por su perfil financiero, comportamiento de gastos, hábitos, salud financiera, análisis personal (ej: "¿cuál es mi perfil?", "¿cómo gasto?", "analiza mi comportamiento", "mi situación financiera"), responde con intent "analyze_financial_profile" y extrae timeframeMonths (número de meses a analizar, default: 6).
-- Si el usuario menciona INGRESOS, ganancias, cobros, salarios, carga de dinero a cuenta, acreditaciones, depósitos entrantes (ej: "gané", "cobré", "me pagaron", "recibí", "me acreditaron", "me depositaron", "me ingresaron", "me transfirieron", "cargué", "cargue", "cargar", "deposité en mi cuenta", "transferí a mi cuenta"), responde con intent "add_income" y extrae amount, currency, source (fuente del ingreso), category, year, month, day, account, paymentMethod. IMPORTANTE: Distinguir transferencias HACIA la cuenta del usuario (ingreso) de transferencias DESDE la cuenta (gasto).
+- Si el usuario pregunta por activos específicos de mercado (CEDEARs, Criptomonedas, Acciones, BTC, Bitcoin, Ethereum, etc) o recomendaciones de inversión en ellos (ej: "¿qué cedear comprar?", "¿mejores acciones?", "¿cuáles son los mejores cedear?", "¿qué cripto sube?"), responde con intent "query_market_info" y extrae activo (ej: "cedear", "criptomoneda", "acción"), period (ej: "hoy", "semana", "mes"), tipo (ej: "mejores", "subiendo", "recomendación").
+- Si el usuario menciona gastos, compras, pagos o TRANSFERENCIAS HACIA TERCEROS (ej: "gasté", "pagué", "transferí 5000 a Juan"), responde con intent "add_expense" y extrae amount, currency, merchant, category, etc.
+- Si el usuario hace preguntas de educación financiera general (ej: "¿cómo ahorrar?", "¿qué es un presupuesto?"), responde con intent "general_knowledge".
+- Si el usuario menciona INGRESOS, ganancias o TRANSFERENCIAS HACIA SU PROPIA CUENTA (ej: "cobré", "me pagaron", "transferí a mi cuenta", "me transferí"), responde con intent "add_income".
 - Si el usuario menciona "quiero gastar", "gastar solo", "gastar máximo", "presupuesto", "no gastar más de", "asigno" (para CREAR presupuesto), responde con intent "create_budget" y extrae category, month, year, amount, operation: "set".
 - Si el usuario dice "agregar al presupuesto", "aumentar presupuesto", "subir tope" (para MODIFICAR), responde con intent "create_budget" y extrae category, amount, operation: "add".
 - Si el usuario pregunta "PUEDO gastar", "me alcanza", "cómo voy con el presupuesto", "tengo saldo para", responde con intent "check_budget" y extrae category (si hay), amount (si pregunta por un monto específico), month, year.
@@ -489,7 +518,9 @@ REGLAS ADICIONALES:
 - Si el usuario menciona crear una cuenta bancaria o billetera, responde con intent "create_account" y extrae name, type, currency, primary (falso por defecto), reconciled (falso por defecto), archived (falso por defecto).
 - Si el usuario menciona crear una categoría nueva, responde con intent "create_category" y extrae name, type ("income" o "expense"), icon, color, budgetLimit.
 - Si el usuario menciona invertir, comprar activos CON monto específico, responde con intent "invest" y extrae activo, amount, currency, periodo, tipo.
-- Si el usuario menciona GASTOS, pagos, compras, retiros, extracciones, transferencias a terceros (ej: "gasté", "pagué", "compré", "saqué plata", "retiré", "extraje", "me cobraron", "salió", "salieron", "compro", "pago", "transferí a [persona/comercio]"), responde con intent "add_expense" y extrae amount, currency ('ARS' o 'USD'), merchant, category, description, year, month, day, account, paymentMethod (usar referencias temporales de arriba). CONTEXTO ARGENTINO: "saqué" generalmente significa retiro de cajero o gasto, NO ingreso.
+- Si el usuario menciona GASTOS, pagos, compras, retiros, extracciones, transferencias a terceros (ej: "gasté", "pagué", "compré", "saqué plata", "retiré", "extraje", "me cobraron", "salió", "salieron", "compro", "pago", "transferí a [persona/comercio]"), responde con intent "add_expense" y extrae amount, currency ('ARS' o 'USD'), merchant, category, description, year, month, day, account, paymentMethod (usar referencias temporales de arriba). 
+- REGLA CRÍTICA MERCHANT: NUNCA extraigas artículos ("un", "una", "el", "la", "unos", "unas") como merchant. Si el usuario dice "gasté 100 en un café", merchant debe ser "café" o estar vacío, NUNCA "un". 
+- CONTEXTO ARGENTINO: "saqué" generalmente significa retiro de cajero o gasto, NO ingreso.
 - Si el usuario pregunta por resumen, balance, gastos con comparación entre períodos (ej: "en comparación al año pasado", "comparar con el mes anterior", "vs el anterior"), responde con intent "query_comparison" y extrae month, year, compare_month, compare_year. IMPORTANTE: Si dice "mes anterior" o "el anterior", calcular correctamente el mes inmediatamente previo (ver reglas de REFERENCIAS TEMPORALES arriba). Si pregunta por categoría específica (ej: "en comida"), extraer category también.
 - Si el usuario pregunta por resumen, balance, gastos altos, recurrentes SIN comparación, responde con intent "query_summary" o "query_top_expenses" según corresponda.
 - Si el usuario pregunta por categorización, responde con intent "categorize".
@@ -529,6 +560,7 @@ EJEMPLOS:
 - "Pagué Spotify 1200" → {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 1200, "currency": "ARS", "category": "spotify", "merchant": "Spotify", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
 - "Pedí Rappi 8500" → {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 8500, "currency": "ARS", "category": "delivery", "merchant": "Rappi", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
 - "Tomé un Uber 3200" → {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 3200, "currency": "ARS", "category": "uber", "merchant": "Uber", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+- "Compré una TV en 12 cuotas de 50000" → {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 600000, "currency": "ARS", "category": "tecnologia", "merchant": "TV", "paymentMethod": "credito", "creditDetails": {"installments": 12}, "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
 - "Cargué la SUBE 5000" → {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 5000, "currency": "ARS", "category": "sube", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
 - "Pagué el internet 9800" → {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 9800, "currency": "ARS", "category": "internet", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
 - "Compré en la farmacia 6400" → {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 6400, "currency": "ARS", "category": "farmacia", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
@@ -547,6 +579,13 @@ EJEMPLOS:
 - "Compará este mes vs el anterior" → {"intent": "query_comparison", "confidence": 0.99, "entities": {"month": ${currentMonth}, "year": ${currentYear}, "compare_month": ${currentMonth === 1 ? 12 : currentMonth - 1}, "compare_year": ${currentMonth === 1 ? lastYear : currentYear}}}
 - "Compará este mes vs el anterior en comida" → {"intent": "query_comparison", "confidence": 0.99, "entities": {"month": ${currentMonth}, "year": ${currentYear}, "compare_month": ${currentMonth === 1 ? 12 : currentMonth - 1}, "compare_year": ${currentMonth === 1 ? lastYear : currentYear}, "category": "comida"}}
 - "Gastos de enero vs diciembre" → {"intent": "query_comparison", "confidence": 0.99, "entities": {"month": 1, "year": ${currentYear}, "compare_month": 12, "compare_year": ${lastYear}}}
+- "cuanto gaste en transporte en diciembre 2025" → {"intent": "query_summary", "confidence": 0.99, "entities": {"month": 12, "year": 2025, "category": "transporte"}}
+- "resumen de gastos de mayo" → {"intent": "query_summary", "confidence": 0.99, "entities": {"month": 5, "year": ${currentYear}}}
+
+CRÍTICO:
+- Si el usuario menciona SOLO UN período (un mes, un año, "este mes", "diciembre 2025"), el intent DEBE ser "query_summary".
+- El intent "query_comparison" SOLO debe usarse si hay palabras de comparación explícitas ("comparar", "vs", "versus", "en comparación a", "contra") O si menciona dos períodos claramente distintos para contrastar.
+- NUNCA compares con el futuro. Si hoy es ${currentMonth}/${currentYear}, no inventes comparaciones con meses posteriores.
 
 Mensaje: "${message}"`;
 
