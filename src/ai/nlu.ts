@@ -79,8 +79,8 @@ const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
   { name: 'query_summary', re: /\b(desde que|en los últimos|últimos \d+ (días|meses)).*gast/i },
 
   // Gastos/ingresos
-  { name: 'add_expense', re: /\b(gasté|gaste|gastó|pagué|pague|pagó|compré|compre|compró|saqué|saque|sacó|retiré|retire|retiró|extraje|me cobraron|me cobró|me descontaron|salió|salieron|gasto|pago|compro|saco|retiro|registrar gasto|agregar gasto|anotar gasto|transferí(?! a mi))\b/i },
-  { name: 'add_income', re: /\b(gané|gane|ganó|cobré|cobre|cobró|recibí|recibe|recibió|me pagaron|me pagó|me ingresó|me ingresaron|me acreditaron|me acreditó|me depositaron|me depositó|ingreso|ingresos|percibí|percibe|percibió|sueldo|salario|cargué|cargue|cargó|cargar|deposité|deposite|depositó|depositar|transferí a mi|me transfirieron|me transferí)\b/i },
+  { name: 'add_expense', re: /\b(gasté|gaste|gastó|pagué|pague|pagó|compré|compre|compró|saqué|saque|sacó|retiré|retire|retiró|extraje|extrajo|me cobraron|me cobró|me descontaron|salió|salio|salieron|gasto|pago|compro|saco|retiro|registrar gasto|agregar gasto|anotar gasto|transferí(?! a mi)|transferi(?! a mi)|comí|comi|bebí|bebi|tomé|tome|mande|mandé|envie|envié|perdí|perdi|presté|preste|devolví|devolvi|debitaron)\b/i },
+  { name: 'add_income', re: /\b(gané|gane|ganó|cobré|cobre|cobró|recibí|recibe|recibió|recibi|me pagaron|me pagó|me ingresó|me ingreso|me ingresaron|me acreditaron|me acreditó|me acredite|me depositaron|me depositó|ingreso|ingresos|percibí|percibe|percibió|percibi|sueldo|salario|cargué|cargue|cargó|cargar|deposité|deposite|depositó|depositar|transferí a mi|me transfirieron|me transferí|transferi a mi|me transferi|entro|entró|llegó|llego plata|mandaron)\b/i },
 
   // Presupuestos
   { name: 'check_budget', re: /\b(puedo gastar|me alcanza|tengo presupuesto|presupuesto disponible|cuánto me queda|cómo voy con|estado de|situación de).*(presupuesto|gasto|categoría|para)\b/i },
@@ -288,11 +288,22 @@ export async function parseMessage(message: string): Promise<NLUResult> {
   }
 
   // Detectar montos (puede haber múltiples montos en un solo mensaje)
-  const amountMatches = Array.from(message.matchAll(/([+-]?\d+[\d,.]*)/g));
+  // Usar una versión limpia del mensaje para evitar detectar la fecha "el 1" como monto 1
+  let msgForAmounts = message;
+  if (entities._dateDescription) {
+    // Reemplazar la descripción de la fecha (ej "el 1") por espacios para no alterar índices o concatenar palabras
+    msgForAmounts = msgForAmounts.replace(new RegExp(entities._dateDescription, 'i'), ' '.repeat(entities._dateDescription.length));
+  }
+
+  const amountMatches = Array.from(msgForAmounts.matchAll(/([+-]?\d+[\d,.]*)/g));
   // Filtrar años (números de 4 dígitos >= 2000) para no confundirlos con montos
   const realAmounts = amountMatches.filter(m => {
     const num = Number(m[1].replace(/,/g, ''));
-    return !(num >= 2000 && num <= 2100 && m[1].length === 4);
+    // Filtrar si es un año probable (2000-2100) Y tiene longitud 4
+    if (num >= 2000 && num <= 2100 && m[1].length === 4) return false;
+    // Filtrar si es muy pequeño (ej 1) y parece ser parte de una fecha que no se limpió bien? 
+    // No, mejor confiar en la limpieza de _dateDescription.
+    return true;
   });
   // Si hay múltiples montos y NO menciona "presupuesto", pedir a OpenAI que devuelva un array estructurado de items
   if (realAmounts && realAmounts.length > 1 && !/presupuesto/i.test(message)) {
@@ -462,8 +473,13 @@ IMPORTANTE - REFERENCIAS TEMPORALES (HOY es ${now.getDate()}/${currentMonth}/${c
   * Si estamos en cualquier otro mes: mes anterior = mes actual - 1 del mismo año (compare_month: ${currentMonth - 1}, compare_year: ${currentYear})
   * "Mes anterior" NO significa el mismo mes del año pasado, significa el mes cronológicamente previo
   * Ejemplo: Si hoy es enero 2026 y dice "comparar con el anterior", debe ser diciembre 2025, NO enero 2025
-- CRÍTICO - Para add_expense e add_income:
-  * Si el usuario usa tiempo pasado simple ("gasté", "pagué", "compré", "saqué", "retiré", "gané", "cobré", "cargué", "recibí", "me pagaron", "me acreditaron") SIN mencionar fecha explícita (ej: "ayer", "el lunes", "hace 3 días"), asumir que es HOY
+- CRÍTICO - Para add_expense e add_income (MANEJO DE TIEMPOS Y TILDES):
+  * EN LA COTIDIANIDAD EL USUARIO NO SIEMPRE USA TILDES. La conjugación del verbo define el tiempo.
+  * REGLA GENERAL: Interpretar CUALQUIER verbo relacionado con movimiento de dinero conjugado en pasado (terminado en 'e', 'i', 'o' usualmente) COMO UNA ACCIÓN PASADA, aunque no tenga tilde.
+  * INGRESOS (add_income): "cobre" (=cobré), "gane" (=gané), "recibi" (=recibí), "entro" (=entró), "ingreso" (=ingresó), "acredite" (=acredité), "llegó", "llego".
+  * EGRESOS (add_expense): "pague" (=pagué), "gaste" (=gasté), "compre" (=compré), "comi", "bebi", "sali", "mande" (=mandé), "envie", "transferi", "saque" (=saqué), "retire", "perdi".
+  * Si el usuario usa estos verbos (o cualquier similar de acción financiera) SIN mencionar fecha explícita, asumir que es HOY.
+  * "el 1", "el 15", "el 30": es una FECHA explícita. "El [número]" se refiere al día [número] del mes actual (o mes anterior si el día es futuro respecto a hoy).
   * Si el usuario dice explícitamente "hoy", usar day: ${now.getDate()}, month: ${currentMonth}, year: ${currentYear}
   * Si NO se menciona fecha específica en absoluto, usar day: ${now.getDate()}, month: ${currentMonth}, year: ${currentYear}
   * SIEMPRE incluir day, month y year en entities para add_expense y add_income (no dejar ninguno vacío)
@@ -509,7 +525,7 @@ REGLAS ADICIONALES:
 - Si el usuario pregunta por activos específicos de mercado (CEDEARs, Criptomonedas, Acciones, BTC, Bitcoin, Ethereum, etc) o recomendaciones de inversión en ellos (ej: "¿qué cedear comprar?", "¿mejores acciones?", "¿cuáles son los mejores cedear?", "¿qué cripto sube?"), responde con intent "query_market_info" y extrae activo (ej: "cedear", "criptomoneda", "acción"), period (ej: "hoy", "semana", "mes"), tipo (ej: "mejores", "subiendo", "recomendación").
 - Si el usuario menciona gastos, compras, pagos o TRANSFERENCIAS HACIA TERCEROS (ej: "gasté", "pagué", "transferí 5000 a Juan"), responde con intent "add_expense" y extrae amount, currency, merchant, category, etc.
 - Si el usuario hace preguntas de educación financiera general (ej: "¿cómo ahorrar?", "¿qué es un presupuesto?"), responde con intent "general_knowledge".
-- Si el usuario menciona INGRESOS, ganancias o TRANSFERENCIAS HACIA SU PROPIA CUENTA (ej: "cobré", "me pagaron", "transferí a mi cuenta", "me transferí"), responde con intent "add_income".
+- Si el usuario menciona INGRESOS, ganancias, cobros o TRANSFERENCIAS HACIA SU PROPIA CUENTA (ej: "cobré", "cobre", "me pagaron", "transferí a mi cuenta", "me transferí"), responde con intent "add_income".
 - Si el usuario menciona "quiero gastar", "gastar solo", "gastar máximo", "presupuesto", "no gastar más de", "asigno" (para CREAR presupuesto), responde con intent "create_budget" y extrae category, month, year, amount, operation: "set".
 - Si el usuario dice "agregar al presupuesto", "aumentar presupuesto", "subir tope" (para MODIFICAR), responde con intent "create_budget" y extrae category, amount, operation: "add".
 - Si el usuario pregunta "PUEDO gastar", "me alcanza", "cómo voy con el presupuesto", "tengo saldo para", responde con intent "check_budget" y extrae category (si hay), amount (si pregunta por un monto específico), month, year.

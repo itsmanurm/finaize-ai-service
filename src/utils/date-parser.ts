@@ -24,7 +24,7 @@ export function getArgentinaDate(): Date {
 export function parseRelativeDate(message: string): ParsedDate | null {
   const msg = message.toLowerCase().trim();
   const now = getArgentinaDate();
-  
+
   // Hoy
   if (/\bhoy\b/.test(msg)) {
     return {
@@ -33,7 +33,7 @@ export function parseRelativeDate(message: string): ParsedDate | null {
       description: 'hoy'
     };
   }
-  
+
   // Ayer
   if (/\bayer\b/.test(msg)) {
     const yesterday = new Date(now);
@@ -44,7 +44,7 @@ export function parseRelativeDate(message: string): ParsedDate | null {
       description: 'ayer'
     };
   }
-  
+
   // Anteayer
   if (/\banteayer\b/.test(msg)) {
     const dayBefore = new Date(now);
@@ -55,14 +55,14 @@ export function parseRelativeDate(message: string): ParsedDate | null {
       description: 'anteayer'
     };
   }
-  
+
   // Hace X días/semanas/meses
   const agoMatch = msg.match(/hace\s+(\d+)\s+(d[ií]as?|semanas?|meses?)/i);
   if (agoMatch) {
     const amount = parseInt(agoMatch[1]);
     const unit = agoMatch[2];
     const date = new Date(now);
-    
+
     if (/d[ií]as?/.test(unit)) {
       date.setDate(date.getDate() - amount);
       return {
@@ -86,7 +86,7 @@ export function parseRelativeDate(message: string): ParsedDate | null {
       };
     }
   }
-  
+
   // Días de la semana (lunes, martes, etc.) - se refiere al más reciente
   const weekdays = {
     'lunes': 1,
@@ -99,26 +99,26 @@ export function parseRelativeDate(message: string): ParsedDate | null {
     'sabado': 6,
     'domingo': 0
   };
-  
+
   for (const [dayName, dayNum] of Object.entries(weekdays)) {
     const regex = new RegExp(`\\b(el\\s+)?${dayName}(\\s+pasado)?\\b`, 'i');
     if (regex.test(msg)) {
       const targetDate = new Date(now);
       const currentDay = targetDate.getDay();
       let daysToSubtract = currentDay - dayNum;
-      
+
       // Si el día ya pasó esta semana, calculamos desde hoy
       if (daysToSubtract <= 0) {
         daysToSubtract += 7;
       }
-      
+
       // Si dice "pasado", agregamos una semana más
       if (/pasado/.test(msg)) {
         daysToSubtract += 7;
       }
-      
+
       targetDate.setDate(targetDate.getDate() - daysToSubtract);
-      
+
       return {
         date: targetDate,
         confidence: 0.90,
@@ -126,7 +126,7 @@ export function parseRelativeDate(message: string): ParsedDate | null {
       };
     }
   }
-  
+
   // La semana pasada (interpretar como el mismo día de la semana pasada)
   if (/la semana pasada/.test(msg)) {
     const lastWeek = new Date(now);
@@ -137,7 +137,7 @@ export function parseRelativeDate(message: string): ParsedDate | null {
       description: 'la semana pasada'
     };
   }
-  
+
   // El mes pasado (interpretar como el mismo día del mes pasado)
   if (/el mes pasado/.test(msg)) {
     const lastMonth = new Date(now);
@@ -148,7 +148,7 @@ export function parseRelativeDate(message: string): ParsedDate | null {
       description: 'el mes pasado'
     };
   }
-  
+
   // El año pasado
   if (/el a[ñn]o pasado/.test(msg)) {
     const lastYear = new Date(now);
@@ -159,7 +159,38 @@ export function parseRelativeDate(message: string): ParsedDate | null {
       description: 'el año pasado'
     };
   }
-  
+
+  // El [numero] (ej: el 1, el 15, el 30)
+  const elDayMatch = msg.match(/\bel\s+(\d{1,2})\b/);
+  if (elDayMatch) {
+    const day = parseInt(elDayMatch[1]);
+    // Validar día válido (1-31)
+    if (day >= 1 && day <= 31) {
+      const targetDate = new Date(now);
+      targetDate.setDate(day);
+
+      // Si el día es mayor al día actual, podría referirse al mes pasado? 
+      // Por defecto asumimos mes actual como pide la regla, pero si se quiere lógica "si es futuro -> mes pasado", se puede agregar.
+      // Por ahora: mes actual.
+      // EXCEPCIÓN: Si hoy es día 5 y dice "el 30", asumimos mes pasado para no tirar futuro?
+      // La regla general de isFutureDate lo validará después si es para gastos.
+      // Pero para "cobre el 30" estando en día 5, probablemente sea mes pasado.
+      if (day > now.getDate()) {
+        // Si el día mencionado es mayor a hoy, y estamos hablando de cosas pasadas (gasté, cobré), 
+        // es muy probable que sea del mes anterior.
+        // Sin embargo, si solo dice "el 30" sin contexto de verbo, es ambiguo.
+        // Dado el request del usuario "el 1 cobre", asumiremos mes actual si day <= hoy, y mes anterior si day > hoy.
+        targetDate.setMonth(targetDate.getMonth() - 1);
+      }
+
+      return {
+        date: targetDate,
+        confidence: 0.90,
+        description: `el ${day}`
+      };
+    }
+  }
+
   return null;
 }
 
