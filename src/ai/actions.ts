@@ -116,8 +116,13 @@ export async function queryTopExpenses(payload: { year?: number; month?: number 
     });
   }
 
-  // Solo gastos
-  filtered = filtered.filter((it: any) => it.transactionType === 'egreso' || (Number(it.amount) > 0 && !it.transactionType));
+  // Solo gastos (excluir transferencias internas)
+  filtered = filtered.filter((it: any) => {
+    // Excluir transferencias internas
+    if (it.isInternalTransfer === true || it.transactionType === 'transferencia') return false;
+    // Incluir solo egresos
+    return it.transactionType === 'egreso' || (Number(it.amount) > 0 && !it.transactionType);
+  });
   // Ordenar por monto descendente y tomar top 3
   const top = filtered.sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0)).slice(0, 3);
   return {
@@ -133,6 +138,22 @@ import { getArgentinaDate } from '../utils/date-parser';
 
 const BACKEND_URL = process.env.FINAIZE_BACKEND_URL || 'http://localhost:3001';
 
+function buildBearer(token?: string): string | undefined {
+  if (!token) return undefined;
+  return token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+}
+
+function resolveSystemCashNames(accounts: any[]) {
+  const ars = accounts.find((a: any) => a.type === 'cash' && a.currency === 'ARS' && a.isSystemAccount === true) ||
+              accounts.find((a: any) => a.type === 'cash' && a.currency === 'ARS');
+  const usd = accounts.find((a: any) => a.type === 'cash' && a.currency === 'USD' && a.isSystemAccount === true) ||
+              accounts.find((a: any) => a.type === 'cash' && a.currency === 'USD');
+  return {
+    arsName: ars?.name || 'Efectivo (ARS)',
+    usdName: usd?.name || 'Efectivo (USD)'
+  };
+}
+
 async function getAccounts(token?: string) {
   if (!token) {
     console.warn('[actions] getAccounts: No token provided');
@@ -142,7 +163,7 @@ async function getAccounts(token?: string) {
     const url = `${BACKEND_URL}/api/accounts?archived=all`;
     console.log('[actions] Fetching accounts from:', url);
     const res = await fetch(url, {
-      headers: { 'Authorization': token }
+      headers: { 'Authorization': buildBearer(token) as any }
     });
     if (res.ok) {
       const data = await res.json();
@@ -162,26 +183,33 @@ export async function actionAddExpense(payload: { amount: number; currency?: str
   const { amount, currency = 'ARS', merchant, description, when, paymentMethod, token } = payload;
 
   // Resolve account based on currency and keywords
-  let account = payload.account || 'Efectivo';
+  let account = payload.account || '';
+
+  // If we have a token, prefer exact system cash account names from backend
+  let systemNames: { arsName: string; usdName: string } | null = null;
+  if (token) {
+    const accounts = await getAccounts(token);
+    systemNames = resolveSystemCashNames(accounts);
+  }
 
   // Normalize account name to lowercase for comparison
   const accountLower = (account || '').toLowerCase().trim();
 
   // Smart account resolution based on keywords first (overrides default currency if needed)
   if (accountLower.includes('dolar') || accountLower.includes('usd') || accountLower.includes('verde')) {
-    account = 'Efectivo USD';
+    account = systemNames?.usdName || 'Efectivo (USD)';
     // Implicitly correct currency if needed, though strictly we stick to payload currency unless we want to auto-fix it too
   } else if (accountLower.includes('peso') || accountLower.includes('ars')) {
-    account = 'Efectivo';
+    account = systemNames?.arsName || 'Efectivo (ARS)';
   } else if (currency === 'USD') {
     // If currency is USD and account is generic or empty, default to Efectivo USD
     if (accountLower === 'efectivo' || !accountLower) {
-      account = 'Efectivo USD';
+      account = systemNames?.usdName || 'Efectivo (USD)';
     }
   } else {
     // Default ARS/Generic
     if (accountLower === 'efectivo' || !accountLower) {
-      account = 'Efectivo';
+      account = systemNames?.arsName || 'Efectivo (ARS)';
     }
   }
 
@@ -252,26 +280,33 @@ export async function actionAddIncome(payload: { amount: number; currency?: stri
   const { amount, currency = 'ARS', source, description, when, token } = payload;
 
   // Resolve account based on currency and keywords (same logic as expenses)
-  let account = payload.account || 'Efectivo';
+  let account = payload.account || '';
+
+  // If we have a token, prefer exact system cash account names from backend
+  let systemNames: { arsName: string; usdName: string } | null = null;
+  if (token) {
+    const accounts = await getAccounts(token);
+    systemNames = resolveSystemCashNames(accounts);
+  }
 
   // Normalize account name to lowercase for comparison
   const accountLower = (account || '').toLowerCase().trim();
 
   // Smart account resolution based on keywords first (overrides default currency if needed)
   if (accountLower.includes('dolar') || accountLower.includes('usd') || accountLower.includes('verde')) {
-    account = 'Efectivo USD';
+    account = systemNames?.usdName || 'Efectivo (USD)';
     // Implicitly correct currency if needed, though strictly we stick to payload currency unless we want to auto-fix it too
   } else if (accountLower.includes('peso') || accountLower.includes('ars')) {
-    account = 'Efectivo';
+    account = systemNames?.arsName || 'Efectivo (ARS)';
   } else if (currency === 'USD') {
     // If currency is USD and account is generic or empty, default to Efectivo USD
     if (accountLower === 'efectivo' || !accountLower) {
-      account = 'Efectivo USD';
+      account = systemNames?.usdName || 'Efectivo (USD)';
     }
   } else {
     // Default ARS/Generic
     if (accountLower === 'efectivo' || !accountLower) {
-      account = 'Efectivo';
+      account = systemNames?.arsName || 'Efectivo (ARS)';
     }
   }
 
@@ -390,6 +425,9 @@ export async function actionQuerySummary(payload: { items?: any[]; classifyMissi
       .reduce((acc, it) => acc + (Number(it.amount) || 0), 0);
   } else {
     for (const it of filtered) {
+      // Excluir transferencias internas
+      if (it.isInternalTransfer === true || it.transactionType === 'transferencia') continue;
+
       const isIncome = it.transactionType === 'ingreso' || (it.amount < 0 && !it.transactionType);
       const isExpense = it.transactionType === 'egreso' || (it.amount > 0 && !it.transactionType);
 

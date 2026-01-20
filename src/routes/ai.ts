@@ -109,6 +109,9 @@ r.post('/summarize', async (req, res) => {
   const byMerchant = new Map<string, number>();
 
   for (const it of enriched) {
+    // Excluir transferencias internas
+    if ((it as any).isInternalTransfer === true || (it as any).transactionType === 'transferencia') continue;
+
     const isIncome = (it as any).transactionType === 'ingreso' || (!(it as any).transactionType && it.amount >= 0);
 
     if (isIncome) totalIncome += it.amount;
