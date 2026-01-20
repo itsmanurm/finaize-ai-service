@@ -29,6 +29,7 @@ export type Entities = {
   source?: string;
   goalName?: string;
   items?: any[];
+  description?: string;
   // extensible: puedes agregar más campos según lo que devuelva OpenAI
 };
 
@@ -438,7 +439,7 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
     const prompt = `Eres un parser de intención financiera experto. Tu tarea es identificar el intent y extraer entidades del mensaje. Responde SOLO JSON con las keys: intent, confidence, entities. Siempre responde en español.
 
 ENTIDADES A EXTRAER SEGÚN EL INTENT:
-- Para gastos/ingresos: amount, currency, merchant, category, description, year, month, day, account (ej: "Efectivo", "Banco", "Tarjeta"), paymentMethod ("efectivo", "debito", "credito", "transferencia"), creditDetails (solo para gastos: installments, interestRate)
+- Para gastos/ingresos: amount, currency, merchant, category, description (UNA DESCRIPCION CORTA Y COHERENTE BASADA EN EL MENSAJE, ej: "Sueldo", "Venta de auto", "Pago luz"), year, month, day, account (ej: "Efectivo", "Banco", "Tarjeta"), paymentMethod ("efectivo", "debito", "credito", "transferencia"), creditDetails (solo para gastos: installments, interestRate)
 - Para presupuestos - CREAR (create_budget): category, month, year, amount, currency, operation ("set" para fijar/crear, "add" para agregar/aumentar). (Ej: "QUIERO gastar 300" -> set, "AGREGAR 300 al presupuesto" -> add)
 - Para presupuestos - CONSULTAR (check_budget): category, month, year, amount (si pregunta si puede gastar X). (Ej: "PUEDO gastar?", "Me alcanza?", "Cómo voy?")
 - Para metas: amount, currency, description, goalName, categories (array de strings), deadline (fecha límite si se menciona), year, month
@@ -456,7 +457,16 @@ IMPORTANTE - MONTOS Y FORMATO ARGENTINO:
 - Detectar moneda: "pesos", "ARS", "$", "pe" → ARS
 - CONTEXTO ARGENTINO: "$" sin aclaración significa ARS, no USD
 
-IMPORTANTE - REFERENCIAS TEMPORALES (HOY es ${now.getDate()}/${currentMonth}/${currentYear}):
+    - CRÍTICO - DESCRIPCIONES INTELIGENTES (description):
+      * NO DEJAR VACÍO el campo description, source o merchant.
+      * Si el usuario dice "cobre 5000", description: "Cobro general" o "Ingreso vario".
+      * Si dice "cobre el sueldo", description: "Sueldo".
+      * Si dice "gane en el casino", description: "Casino" o "Apuestas".
+      * Si dice "pague la luz", description: "Luz".
+      * Generar una etiqueta corta y natural que describa la transacción.
+    
+    IMPORTANTE - REFERENCIAS TEMPORALES (HOY es ${now.getDate()}/${currentMonth}/${currentYear}):
+
 - Si el usuario pregunta "desde que abrí la cuenta", "desde que tengo cuenta", "desde el inicio": NO extraer year ni month. En su lugar, poner: all_time: true
 - Año actual: ${currentYear}
 - Mes actual: ${currentMonth}
@@ -597,6 +607,25 @@ EJEMPLOS:
 - "Gastos de enero vs diciembre" → {"intent": "query_comparison", "confidence": 0.99, "entities": {"month": 1, "year": ${currentYear}, "compare_month": 12, "compare_year": ${lastYear}}}
 - "cuanto gaste en transporte en diciembre 2025" → {"intent": "query_summary", "confidence": 0.99, "entities": {"month": 12, "year": 2025, "category": "transporte"}}
 - "resumen de gastos de mayo" → {"intent": "query_summary", "confidence": 0.99, "entities": {"month": 5, "year": ${currentYear}}}
+
+EJEMPLO DE SALIDA JSON (FORMATO ESTRICTO):
+- Input: "Cobre 5000"
+- Output: { "intent": "add_income", "confidence": 0.99, "entities": { "amount": 5000, "currency": "ARS", "description": "Cobro general", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear} } }
+
+- Input: "Transfiri 15000 a Juan Perez"
+- Output: { "intent": "add_expense", "confidence": 0.99, "entities": { "amount": 15000, "currency": "ARS", "description": "Transferencia a Juan Perez", "category": "Transferencias", "merchant": "Juan Perez", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear} } }
+
+- Input: "Me transfirio 20000 Maria Gomez"
+- Output: { "intent": "add_income", "confidence": 0.99, "entities": { "amount": 20000, "currency": "ARS", "description": "Transferencia de Maria Gomez", "source": "Maria Gomez", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear} } }
+
+- Input: "Transferi 50000 de mi banco a mi cuenta sueldo"
+- Output: { "intent": "add_expense", "confidence": 0.99, "entities": { "amount": 50000, "currency": "ARS", "description": "Transferencia propia", "category": "Transferencias", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear} } }
+
+EJEMPLOS DE GENERACIÓN DE DESCRIPCIÓN INDUCIDA:
+- "Cobre 5000" → {"intent": "add_income", "confidence": 0.99, "entities": {"amount": 5000, "currency": "ARS", "description": "Cobro general", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+- "Pague la luz" → {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": null, "description": "Pago de Luz", "category": "Servicios", "merchant": "Luz", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+- "Gane 20000 en el casino" → {"intent": "add_income", "confidence": 0.99, "entities": {"amount": 20000, "currency": "ARS", "description": "Casino", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+- "Cobre el sueldo" → {"intent": "add_income", "confidence": 0.99, "entities": {"amount": null, "currency": "ARS", "description": "Sueldo", "category": "Salario", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
 
 CRÍTICO:
 - Si el usuario menciona SOLO UN período (un mes, un año, "este mes", "diciembre 2025"), el intent DEBE ser "query_summary".
