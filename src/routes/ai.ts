@@ -5,6 +5,7 @@ import { appendJsonl } from '../utils/jsonl';
 import { parseMessage } from '../ai/nlu';
 import { analyzeFinancialProfile } from '../ai/profile-analyzer';
 import { AnomalyService } from '../ai/anomaly';
+import { notifyAnomaly, notifyRecurringSubscription } from '../utils/notification-client';
 
 const r = Router();
 
@@ -193,7 +194,7 @@ r.post('/test-cases', async (req, res) => {
 
 /** POST /ai/analyze-profile - Analiza el perfil financiero del usuario */
 r.post('/analyze-profile', async (req, res) => {
-  const { transactions, budgets, goals, timeframeMonths } = req.body || {};
+  const { transactions, budgets, goals, timeframeMonths, userId } = req.body || {};
 
   if (!Array.isArray(transactions) || transactions.length === 0) {
     return res.status(400).json({
@@ -211,6 +212,26 @@ r.post('/analyze-profile', async (req, res) => {
       goals: goals || [],
       timeframeMonths: timeframeMonths || 6
     });
+
+    // Send notifications for detected recurring subscriptions
+    if (userId && profile.patterns?.recurringExpenses) {
+      // Filter for likely subscriptions (frequent + regular amount)
+      const likelySubscriptions = profile.patterns.recurringExpenses.filter(
+        expense => expense.frequency === 'Muy frecuente' || expense.frequency === 'Frecuente'
+      );
+
+      for (const subscription of likelySubscriptions.slice(0, 3)) { // Max 3 notifications per analysis
+        // Calculate actual frequency count from frequency text
+        const frequencyCount = subscription.frequency === 'Muy frecuente' ? 10 : 5;
+        
+        notifyRecurringSubscription(
+          userId,
+          subscription.merchant,
+          subscription.avgAmount,
+          frequencyCount
+        ).catch(err => console.error('[Analyze Profile] Failed to send subscription notification:', err));
+      }
+    }
 
     return res.json({
       ok: true,
@@ -336,10 +357,30 @@ r.post('/anomalies', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'Datos inválidos', details: result.error.issues });
   }
 
-  const { transactions, threshold } = result.data;
+  const { transactions, threshold, userId } = result.data;
 
   try {
     const anomalies = AnomalyService.detectOutliers(transactions, threshold);
+
+    // Send notifications to backend for high severity anomalies
+    if (userId && anomalies.length > 0) {
+      // Only notify for medium/high severity anomalies to avoid spam
+      const notifiableAnomalies = anomalies.filter(a => a.severity !== 'low');
+      
+      for (const anomaly of notifiableAnomalies) {
+        if (anomaly.transactionId) {
+          notifyAnomaly(
+            userId,
+            anomaly.transactionId,
+            anomaly.amount,
+            anomaly.category,
+            anomaly.reason,
+            anomaly.severity
+          ).catch(err => console.error('[Anomalies] Failed to send notification:', err));
+        }
+      }
+    }
+
     return res.json({
       ok: true,
       count: anomalies.length,

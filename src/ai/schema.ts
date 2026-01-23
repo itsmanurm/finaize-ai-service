@@ -81,6 +81,7 @@ export type ForecastRequestInput = z.infer<typeof ForecastRequestSchema>;
 
 export const AnomalyRequestSchema = z.object({
   transactions: z.array(TransactionSchema),
-  threshold: z.number().min(0.1).max(10).optional().default(3.5)
+  threshold: z.number().min(0.1).max(10).optional().default(3.5),
+  userId: z.string().optional() // Optional userId to send notifications
 });
 export type AnomalyRequestInput = z.infer<typeof AnomalyRequestSchema>;
