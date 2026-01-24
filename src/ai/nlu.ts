@@ -57,6 +57,42 @@ function logNLU(level: 'info' | 'warn' | 'error', msg: string, data?: any) {
 
 // Reglas simples y deterministas para intents comunes
 // Ordenadas por especificidad (más específicas primero)
+
+/**
+ * Detecta método de pago en texto libre
+ * Soporta: efectivo, debito, credito, transferencia y variantes comunes
+ */
+function detectPaymentMethodFromText(text: string): 'efectivo' | 'debito' | 'credito' | 'transferencia' | null {
+  const lower = text.toLowerCase().trim();
+
+  // Normalizar acentos para simplificar regex
+  const normalized = lower.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  // Variantes de Transferencia
+  if (/transferencia|transferi|transfiero|transferime/.test(normalized)) {
+    return 'transferencia';
+  }
+
+  // Variantes de Débito
+  if (/debito/.test(normalized) || /\btarjeta\b(?!.*credito)/.test(normalized)) {
+    // Si dice solo "tarjeta" asumimos débito por defecto si no hay "crédito"
+    // A menos que queramos ser mas estrictos, pero el requerimiento dice "tarjeta" -> match
+    return 'debito';
+  }
+
+  // Variantes de Crédito
+  if (/credito|cuotas/.test(normalized)) {
+    return 'credito';
+  }
+
+  // Variantes de Efectivo
+  if (/efectivo|cash|billetes|plata en mano/.test(normalized)) {
+    return 'efectivo';
+  }
+
+  return null;
+}
+
 const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
   // Info de mercado (CEDEARs, Cripto, Acciones) - Prioridad alta
   { name: 'query_market_info', re: /\b(cedear|criptomonedas?|btc|bitcoin|eth|ethereum|acciones|invertir en|mejores inveri|qué activo|qué recomiend|bolsa de valore)\b/i },
@@ -435,6 +471,15 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
     const currentMonth = now.getMonth() + 1;
     const lastYear = currentYear - 1;
     const nextYear = currentYear + 1;
+
+    // CRÍTICO: Detectar método de pago independientemente de OpenAI
+    const detectedPayment = detectPaymentMethodFromText(message);
+    if (detectedPayment) {
+      if (!entities.paymentMethod) {
+        entities.paymentMethod = detectedPayment;
+        logNLU('info', `Payment method detected via helper: ${detectedPayment}`);
+      }
+    }
 
     const prompt = `Eres un parser de intención financiera experto. Tu tarea es identificar el intent y extraer entidades del mensaje. Responde SOLO JSON con las keys: intent, confidence, entities. Siempre responde en español.
 
