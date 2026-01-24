@@ -223,7 +223,7 @@ r.post('/analyze-profile', async (req, res) => {
       for (const subscription of likelySubscriptions.slice(0, 3)) { // Max 3 notifications per analysis
         // Calculate actual frequency count from frequency text
         const frequencyCount = subscription.frequency === 'Muy frecuente' ? 10 : 5;
-        
+
         notifyRecurringSubscription(
           userId,
           subscription.merchant,
@@ -268,11 +268,12 @@ r.post('/forecast', async (req, res) => {
 
     // 2. Separar datos: Históricos (meses anteriores) vs Actuales (mes en curso)
     const now = new Date();
-    const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    // Obtener string "YYYY-MM" local usando la fecha actual del sistema
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1; // 1-12
+    const currentMonthPrefix = `${currentYear}-${currentMonth.toString().padStart(2, '0')}`;
 
-    // Normalizar fechas y valores
-    // Map to { date: Date, value: number }
-    // Group by day first? Yes.
+    console.log(`[AI-Service] Current Month Target: ${currentMonthPrefix}`);
 
     const historicalPointsMap = new Map<string, number>();
     const currentPointsMap = new Map<string, number>();
@@ -280,16 +281,23 @@ r.post('/forecast', async (req, res) => {
     for (const t of filtered) {
       const d = (t as any).date || t.when;
       if (!d) continue;
-      const dateObj = typeof d === 'string' ? new Date(d) : d;
-      if (isNaN(dateObj.getTime())) continue;
 
-      const dateStr = dateObj.toISOString().split('T')[0];
+      // d es string "YYYY-MM-DD" del backend
+      let dateStr = '';
+      if (d instanceof Date) {
+        dateStr = d.toISOString().split('T')[0];
+      } else {
+        dateStr = String(d).split('T')[0];
+      }
+
       const val = Math.abs(Number(t.amount) || 0);
 
-      if (dateObj < startOfCurrentMonth) {
-        historicalPointsMap.set(dateStr, (historicalPointsMap.get(dateStr) || 0) + val);
-      } else {
+      // Comparación Estricta de String: Si empieza con "2026-01" es actual
+      if (dateStr.startsWith(currentMonthPrefix)) {
         currentPointsMap.set(dateStr, (currentPointsMap.get(dateStr) || 0) + val);
+      } else {
+        // Todo lo demás es historia
+        historicalPointsMap.set(dateStr, (historicalPointsMap.get(dateStr) || 0) + val);
       }
     }
 
@@ -298,8 +306,7 @@ r.post('/forecast', async (req, res) => {
 
     const { ForecastingService } = await import('../ai/forecasting');
 
-    // Usar lógica ADAPTATIVA
-    const totalDaysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const totalDaysInMonth = new Date(currentYear, currentMonth, 0).getDate();
     const calendarDayOfMonth = now.getDate(); // 1...31
 
     // Pass calendarDayOfMonth CORRECTLY
@@ -366,7 +373,7 @@ r.post('/anomalies', async (req, res) => {
     if (userId && anomalies.length > 0) {
       // Only notify for medium/high severity anomalies to avoid spam
       const notifiableAnomalies = anomalies.filter(a => a.severity !== 'low');
-      
+
       for (const anomaly of notifiableAnomalies) {
         if (anomaly.transactionId) {
           notifyAnomaly(
