@@ -94,6 +94,9 @@ function detectPaymentMethodFromText(text: string): 'efectivo' | 'debito' | 'cre
 }
 
 const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
+  // Transferencias internas (antes que gastos para evitar falsos positivos)
+  { name: 'create_internal_transfer', re: /\b(de\s+.*\s+a\s+.*cuenta|entre\s+cuentas|desde\s+mi\s+cuenta|a\s+mi\s+cuenta|pas[eé]\s+plata|mover\s+de|transferir\s+de.*a\s+mi)\b/i },
+
   // Info de mercado (CEDEARs, Cripto, Acciones) - Prioridad alta
   { name: 'query_market_info', re: /\b(cedear|criptomonedas?|btc|bitcoin|eth|ethereum|acciones|invertir en|mejores inveri|qué activo|qué recomiend|bolsa de valore)\b/i },
 
@@ -163,12 +166,7 @@ export async function parseMessage(message: string): Promise<NLUResult> {
       if (out.tipo === 'recomendame') out.tipo = 'recomendación';
       if (out.tipo === 'mejor') out.tipo = 'mejores';
     }
-    // category normalización
-    if (out.category) {
-      if (out.category === 'transferencias') out.category = 'transferencia';
-      if (out.category === 'supermercados') out.category = 'supermercado';
-      if (out.category === 'restaurantes') out.category = 'restaurante';
-    }
+    // category normalización removida - canonicalización ocurre en ensureCategoryExists
     // activo normalización
     if (out.activo) {
       if (out.activo === 'acciones') out.activo = 'acción';
@@ -232,13 +230,6 @@ export async function parseMessage(message: string): Promise<NLUResult> {
     logNLU('info', `Comparación detectada: ${entities.month}/${entities.year} vs ${entities.compare_month}/${entities.compare_year}`);
   }
 
-  // Si el mensaje contiene 'transferí', asignar categoría transferencia
-  if (/transfer[ií]/i.test(message)) {
-    entities.category = 'transferencia';
-  }
-  // Monto
-  const amountMatch = message.match(/([+-]?\d+[\d,.]*)/);
-  if (amountMatch) entities.amount = Number(amountMatch[1].replace(/,/g, ''));
   // Moneda
   const currencyMatch = message.match(/\b(ARS|USD|EUR|pesos?|d[oó]lares?|euros?)\b/i);
   if (currencyMatch) entities.currency = currencyMatch[1].toUpperCase();
@@ -261,11 +252,12 @@ export async function parseMessage(message: string): Promise<NLUResult> {
   const enPattern = message.match(/en\s+([A-Za-z0-9áéíóúüñ\-]+)(?:\s|,|\?|$)/i);
   if (enPattern) {
     const candidato = enPattern[1].toLowerCase();
-    // Si es una categoría conocida, guardar como category
-    if (knownCategories.some(c => candidato.includes(c) || c.includes(candidato))) {
+    // Solo setear category si hay match EXACTO con categoría conocida
+    const exactCategoryMatch = knownCategories.find(c => c.toLowerCase() === candidato);
+    if (exactCategoryMatch) {
       category = candidato;
     } else {
-      // Si no, es un merchant
+      // Preferir merchant en caso de duda
       merchant = candidato;
     }
   }
@@ -455,13 +447,31 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
   const DIRECT_ACTION_INTENTS = ['query_dollar_rate', 'query_market_info', 'analyze_financial_profile', 'query_top_expenses'];
   if (matchedIntent && DIRECT_ACTION_INTENTS.includes(matchedIntent)) {
     logNLU('info', `Direct action intent detected, skipping OpenAI: ${matchedIntent}`);
-    return { intent: matchedIntent, confidence: 0.95, entities: normalizeEntities(entities) };
+    // Limpiar entidades
+    const cleanedEntities = normalizeEntities(entities);
+    Object.keys(cleanedEntities).forEach(key => {
+      const val = cleanedEntities[key as keyof Entities];
+      if (key === '_dateDescription' || val === null || val === undefined || val === '' || 
+          (typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length === 0)) {
+        delete cleanedEntities[key as keyof Entities];
+      }
+    });
+    return { intent: matchedIntent, confidence: 0.95, entities: cleanedEntities };
   }
 
   // Si no hay match, o la confianza es baja, usar OpenAI
   const apiKey = config.OPENAI_API_KEY;
   if (!apiKey) {
-    return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.2, entities };
+    // Limpiar entidades antes de retornar sin OpenAI
+    const cleanedEntities = normalizeEntities(entities);
+    Object.keys(cleanedEntities).forEach(key => {
+      const val = cleanedEntities[key as keyof Entities];
+      if (key === '_dateDescription' || val === null || val === undefined || val === '' || 
+          (typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length === 0)) {
+        delete cleanedEntities[key as keyof Entities];
+      }
+    });
+    return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.2, entities: cleanedEntities };
   }
 
   try {
@@ -472,10 +482,11 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
     const lastYear = currentYear - 1;
     const nextYear = currentYear + 1;
 
-    // CRÍTICO: Detectar método de pago independientemente de OpenAI
-    const detectedPayment = detectPaymentMethodFromText(message);
-    if (detectedPayment) {
-      if (!entities.paymentMethod) {
+    // CRÍTICO: Detectar método de pago solo para intents financieros relevantes y no sobrescribir
+    const financialIntents = ['add_expense', 'add_income', 'create_internal_transfer'];
+    if (!entities.paymentMethod && financialIntents.includes(matchedIntent || '')) {
+      const detectedPayment = detectPaymentMethodFromText(message);
+      if (detectedPayment) {
         entities.paymentMethod = detectedPayment;
         logNLU('info', `Payment method detected via helper: ${detectedPayment}`);
       }
@@ -536,8 +547,7 @@ IMPORTANTE - MONTOS Y FORMATO ARGENTINO:
   * Si el usuario usa estos verbos (o cualquier similar de acción financiera) SIN mencionar fecha explícita, asumir que es HOY.
   * "el 1", "el 15", "el 30": es una FECHA explícita. "El [número]" se refiere al día [número] del mes actual (o mes anterior si el día es futuro respecto a hoy).
   * Si el usuario dice explícitamente "hoy", usar day: ${now.getDate()}, month: ${currentMonth}, year: ${currentYear}
-  * Si NO se menciona fecha específica en absoluto, usar day: ${now.getDate()}, month: ${currentMonth}, year: ${currentYear}
-  * SIEMPRE incluir day, month y year en entities para add_expense y add_income (no dejar ninguno vacío)
+  * Si NO se menciona fecha específica en absoluto, NO setear day/month/year (el controller decidirá defaults)
 - IMPORTANTE: Si all_time es true, NO incluir year ni month en entities
 
 IMPORTANTE - MÉTODO DE PAGO Y CUOTAS:
@@ -692,7 +702,16 @@ Mensaje: "${message}"`;
     // Validar que OpenAI retornó algo
     if (!content || content.trim().length === 0) {
       logNLU('warn', 'OpenAI returned empty content, using rule-based fallback');
-      return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.2, entities: normalizeEntities(entities) };
+      // Limpiar entidades antes de retornar
+      const cleanedEntities = normalizeEntities(entities);
+      Object.keys(cleanedEntities).forEach(key => {
+        const val = cleanedEntities[key as keyof Entities];
+        if (key === '_dateDescription' || val === null || val === undefined || val === '' || 
+            (typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length === 0)) {
+          delete cleanedEntities[key as keyof Entities];
+        }
+      });
+      return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.2, entities: cleanedEntities };
     }
 
     // Extraer JSON de la respuesta (puede estar embebido en texto)
@@ -708,21 +727,58 @@ Mensaje: "${message}"`;
         // Validar que al menos tenemos intent
         if (!parsed.intent) {
           logNLU('warn', 'OpenAI response missing intent field');
-          return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.3, entities: normalizeEntities(entities) };
+          // Limpiar entidades antes de retornar
+          const cleanedEntities = normalizeEntities(entities);
+          Object.keys(cleanedEntities).forEach(key => {
+            const val = cleanedEntities[key as keyof Entities];
+            if (key === '_dateDescription' || val === null || val === undefined || val === '' || 
+                (typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length === 0)) {
+              delete cleanedEntities[key as keyof Entities];
+            }
+          });
+          return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.3, entities: cleanedEntities };
         }
 
+        // Limpiar entidades antes de retornar
+        const cleanedEntities = normalizeEntities({ ...entities, ...(parsed.entities || {}) });
+        // Eliminar keys internas y valores vacíos
+        Object.keys(cleanedEntities).forEach(key => {
+          const val = cleanedEntities[key as keyof Entities];
+          if (key === '_dateDescription' || val === null || val === undefined || val === '' || 
+              (typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length === 0)) {
+            delete cleanedEntities[key as keyof Entities];
+          }
+        });
         return {
           intent: parsed.intent || matchedIntent || 'unknown',
           confidence: Math.min(1.0, Math.max(0, parsed.confidence || (matchedIntent ? 0.95 : 0.5))),
-          entities: normalizeEntities({ ...entities, ...(parsed.entities || {}) })
+          entities: cleanedEntities
         };
       } catch (e) {
         logNLU('warn', `JSON parse error: ${(e as any)?.message} `, { jsonText: jsonText.substring(0, 100) });
-        return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.3, entities: normalizeEntities(entities) };
+        // Limpiar entidades en error
+        const cleanedEntities = normalizeEntities(entities);
+        Object.keys(cleanedEntities).forEach(key => {
+          const val = cleanedEntities[key as keyof Entities];
+          if (key === '_dateDescription' || val === null || val === undefined || val === '' || 
+              (typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length === 0)) {
+            delete cleanedEntities[key as keyof Entities];
+          }
+        });
+        return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.3, entities: cleanedEntities };
       }
     } else {
       logNLU('warn', 'OpenAI response does not contain JSON, using rule fallback');
-      return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.2, entities: normalizeEntities(entities) };
+      // Limpiar entidades en fallback
+      const cleanedEntities = normalizeEntities(entities);
+      Object.keys(cleanedEntities).forEach(key => {
+        const val = cleanedEntities[key as keyof Entities];
+        if (key === '_dateDescription' || val === null || val === undefined || val === '' || 
+            (typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length === 0)) {
+          delete cleanedEntities[key as keyof Entities];
+        }
+      });
+      return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.2, entities: cleanedEntities };
     }
   } catch (err) {
     const errMsg = (err as any)?.message || String(err);
@@ -731,10 +787,27 @@ Mensaje: "${message}"`;
     // Fallback final: usar intent rule-based
     if (matchedIntent) {
       logNLU('info', `Using rule - based fallback intent: ${matchedIntent} `);
-      return { intent: matchedIntent, confidence: 0.8, entities: normalizeEntities(entities) };
+      // Limpiar entidades
+      const cleanedEntities = normalizeEntities(entities);
+      Object.keys(cleanedEntities).forEach(key => {
+        const val = cleanedEntities[key as keyof Entities];
+        if (key === '_dateDescription' || val === null || val === undefined || val === '' || 
+            (typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length === 0)) {
+          delete cleanedEntities[key as keyof Entities];
+        }
+      });
+      return { intent: matchedIntent, confidence: 0.8, entities: cleanedEntities };
     }
 
     // Si ni siquiera hay rule match, retornar unknown
-    return { intent: 'unknown', confidence: 0.2, entities: normalizeEntities(entities) };
+    const cleanedEntities = normalizeEntities(entities);
+    Object.keys(cleanedEntities).forEach(key => {
+      const val = cleanedEntities[key as keyof Entities];
+      if (key === '_dateDescription' || val === null || val === undefined || val === '' || 
+          (typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length === 0)) {
+        delete cleanedEntities[key as keyof Entities];
+      }
+    });
+    return { intent: 'unknown', confidence: 0.2, entities: cleanedEntities };
   }
 }

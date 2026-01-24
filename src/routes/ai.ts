@@ -67,7 +67,7 @@ r.post('/categorize/batch', async (req, res) => {
     const pred = await categorize(p.data);
     out.push({ ok: true, ...pred });
   }
-  return res.json({ ok: true, items: out });
+  return res.json({ ok: true, results: out });
 });
 
 /** POST /ai/feedback  -> guarda una línea en data/feedback.jsonl */

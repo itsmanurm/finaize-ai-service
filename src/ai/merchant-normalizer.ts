@@ -39,7 +39,18 @@ const CANON_MAP: Record<string, string> = {
   'spotify': 'Spotify'
 };
 
-
+/**
+ * Normaliza nombres de comercios para categorización AI y deduplicación.
+ * Aplica un mapa canónico de marcas conocidas (Mercado Pago, Netflix, etc.).
+ * 
+ * DIFERENCIA con backend's normalizeDomainText:
+ * - normalizeDomainText (backend): Solo lowercase + trim para cuentas/categorías
+ * - normalizeMerchant (ai-service): Limpieza avanzada + mapeo canónico para comercios
+ * 
+ * Ejemplos:
+ * - "mercado pago mp*" → "Mercado Pago"
+ * - "COTO TXNA123" → "Coto"
+ */
 export function normalizeMerchant(raw?: string): string {
   if (!raw) return '';
   let s = raw;

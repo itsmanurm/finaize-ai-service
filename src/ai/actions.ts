@@ -39,13 +39,40 @@ export async function queryMarketInfo(payload: { activo?: string; period?: strin
 }
 
 /**
+ * ============================================================================
+ * NOTA SOBRE PERSISTENCIA LOCAL (transactions.jsonl):
+ * ============================================================================
+ * 
+ * Las funciones actionAdd* persisten transacciones en un archivo JSONL LOCAL
+ * que sirve como CACHE para el Agent Tool System (OpenAI function calling).
+ * 
+ * PROPÓSITO:
+ * - Cache local para respuestas rápidas del agente sin llamar al backend
+ * - Permite queries del agente sobre transacciones recientes
+ * 
+ * LIMITACIONES:
+ * - NO reemplaza la BD principal del backend (MongoDB)
+ * - NO sincroniza automáticamente con el backend
+ * - Solo visible para el ai-service, no para el frontend
+ * 
+ * PRODUCCIÓN:
+ * - El backend debe exponer POST /api/transactions
+ * - Estas actions deberían delegar persistencia real al backend
+ * - Mantener transactions.jsonl solo como cache secundario
+ * 
+ * ============================================================================
+ */
+
+import { config } from '../config';
+
+/**
  * Acción: Consultar cotizaciones del dólar
  * Llama al backend de Finaize que usa dolarapi.com
  */
 export async function actionQueryDollar() {
   try {
     // URL del backend - usar variable de entorno o fallback
-    const backendUrl = process.env.FINAIZE_BACKEND_URL || 'http://localhost:3001';
+    const backendUrl = process.env.BACKEND_URL || config.BACKEND_URL;
     const response = await fetch(`${backendUrl}/api/investments/market/exchange-rates`);
 
     if (!response.ok) {
@@ -135,8 +162,9 @@ export async function queryTopExpenses(payload: { year?: number; month?: number 
 import { appendJsonl } from '../utils/jsonl';
 import { categorize } from './enhanced-service';
 import { getArgentinaDate } from '../utils/date-parser';
+import { config } from '../config';
 
-const BACKEND_URL = process.env.FINAIZE_BACKEND_URL || 'http://localhost:3001';
+const BACKEND_URL = config.BACKEND_URL;
 
 function buildBearer(token?: string): string | undefined {
   if (!token) return undefined;

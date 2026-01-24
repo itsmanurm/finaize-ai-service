@@ -1,10 +1,10 @@
 import { normalizeMerchant } from './merchant-normalizer';
 import { rulesCategory } from './rule-engine';
-import { createHash } from 'crypto';
 import { getCachedCategorization, setCachedCategorization } from './cache';
 import { categorizeWithOpenAI } from './openai-service';
 import { consultMemory } from './learning-service';
 import { config } from '../config';
+import { dedupHash } from '../utils/hash';
 
 type Currency = 'ARS' | 'USD';
 
@@ -43,30 +43,23 @@ export interface CategorizeOutput {
 // Map para evitar llamadas concurrentes duplicadas para la misma transacción
 const inFlightRequests = new Map<string, Promise<CategorizeOutput>>();
 
-function dedupHash(v: {
-  amount: number;
-  when?: string;
-  merchant_clean?: string;
-  accountLast4?: string;
-  bankMessageId?: string;
-}) {
-  const parts = [
-    Math.abs(Number(v.amount)).toFixed(2),
-    (v.when ?? '').slice(0, 10),
-    (v.merchant_clean ?? '').toLowerCase(),
-    (v.accountLast4 ?? '').trim(),
-    (v.bankMessageId ?? '').trim()
-  ];
-  return createHash('sha1').update(parts.join('|')).digest('hex');
-}
-
-
-
 export async function categorize(input: CategorizeInput): Promise<CategorizeOutput> {
-  // Verificar cache primero
+  // Normalizar merchant una sola vez
+  const merchant_clean = normalizeMerchant(input.merchant || '');
+  
+  // Calcular dedupHash una sola vez
+  const hash = dedupHash({
+    amount: input.amount,
+    when: input.when,
+    merchant_clean,
+    accountLast4: input.accountLast4,
+    bankMessageId: input.bankMessageId
+  });
+
+  // Verificar cache primero (con merchant normalizado)
   const cacheKey = {
     description: input.description,
-    merchant: input.merchant,
+    merchant: merchant_clean,
     amount: input.amount,
     currency: input.currency
   };
@@ -88,19 +81,10 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
       category: userLearned.category,
       confidence: userLearned.confidence,
       reasons: [`learned:${userLearned.source} (${userLearned.count} votes)`],
-      merchant_clean: normalizeMerchant(input.merchant || ''),
-      dedupHash: '', // Se generará abajo si se necesita
+      merchant_clean,
+      dedupHash: hash,
       aiEnhanced: false // No es IA generativa, es memoria
     };
-    // Calcular hash para consistencia
-    const merchant_clean = normalizeMerchant(input.merchant || '');
-    result.dedupHash = dedupHash({
-      amount: input.amount,
-      when: input.when,
-      merchant_clean,
-      accountLast4: input.accountLast4,
-      bankMessageId: input.bankMessageId
-    });
 
     // Guardar en cache para futuro inmediato
     await setCachedCategorization(cacheKey, result);
@@ -109,25 +93,18 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
 
 
 
-  const merchant_clean = normalizeMerchant(input.merchant || '');
   const bag = [merchant_clean, input.description].filter(Boolean).join(' ').trim();
-
-  const common = {
-    merchant_clean,
-    dedupHash: dedupHash({
-      amount: input.amount,
-      when: input.when,
-      merchant_clean,
-      accountLast4: input.accountLast4,
-      bankMessageId: input.bankMessageId
-    })
-  };
 
   // Si se requiere IA específicamente o si no hay match de reglas
   const rule = rulesCategory(bag);
-  // Validar configuración de AI_MIN_CONFIDENCE
-  const minConf = config.AI_MIN_CONFIDENCE;
-  if (isNaN(minConf) || minConf <= 0 || minConf > 1) {
+  
+  // Validar y resolver AI_MIN_CONFIDENCE efectivo
+  const effectiveMinConfidence = 
+    isNaN(config.AI_MIN_CONFIDENCE) || config.AI_MIN_CONFIDENCE <= 0 || config.AI_MIN_CONFIDENCE > 1
+      ? 0.6
+      : config.AI_MIN_CONFIDENCE;
+  
+  if (effectiveMinConfidence === 0.6) {
     console.warn('AI_MIN_CONFIDENCE no está configurado correctamente. Usando valor por defecto: 0.6');
   }
 
@@ -135,11 +112,11 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
   // 1. useAI es true
   // 2. No hay match de reglas regex
   // 3. La confianza de reglas es baja
-  if (input.useAI || !rule.hit || (rule as any).strength < minConf) {
+  if (input.useAI || !rule.hit || (rule as any).strength < effectiveMinConfidence) {
     try {
       // Verificar si OpenAI está disponible
       if (config.OPENAI_API_KEY) {
-        const key = common.dedupHash;
+        const key = hash;
 
         if (inFlightRequests.has(key)) {
           // Reutilizar la petición en curso
@@ -164,7 +141,7 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
               confidence: openAIResult.confidence,
               reasons: [`ai:${openAIResult.reasoning}`],
               merchant_clean,
-              dedupHash: key,
+              dedupHash: hash,
               aiEnhanced: true,
               aiReasoning: openAIResult.reasoning
             };
@@ -203,42 +180,49 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
     }
   }
 
+  // Constantes internas para fallback
+  const FALLBACK_EXPENSE = 'Sin clasificar';
+  const FALLBACK_INCOME = 'Ingresos';
+  
+  // Determinar tipo sin inferir de amount (solo usar transactionType explícito)
+  const isExpense = input.transactionType !== 'ingreso';
+  
   // Aplicar reglas regex
   let result: CategorizeOutput;
 
   if ((rule as any).hit) {
     const conf = Math.min(1, (rule as any).strength);
     let category: string;
-    if (conf >= minConf) {
+    if (conf >= effectiveMinConfidence) {
       category = (rule as any).category;
     } else {
-      // Si la regla tuvo hit pero la confianza es baja, usar fallback basado en el tipo
-      const isExpense = input.transactionType === 'egreso' || (Number(input.amount) < 0 && !input.transactionType);
-      // Nota: Si no hay transactionType, asumimos egreso por defecto para montos positivos (comportamiento estándar)
-      category = isExpense ? 'Sin clasificar' : 'Ingresos';
+      // Si la regla tuvo hit pero la confianza es baja, usar fallback
+      category = isExpense ? FALLBACK_EXPENSE : FALLBACK_INCOME;
     }
     result = {
       category,
       confidence: conf,
       reasons: [(rule as any).reason],
       merchant_clean,
-      dedupHash: common.dedupHash,
+      dedupHash: hash,
       aiEnhanced: false
     };
   } else {
-    const isExpense = input.transactionType === 'egreso' || (Number(input.amount) < 0 && !input.transactionType);
-
-    console.log('DEBUG: Categorize Input:', JSON.stringify(input, null, 2));
-    console.log('DEBUG: Rule Match:', JSON.stringify(rule, null, 2));
-    console.log('DEBUG: AI Confidence Threshold:', minConf);
-    // Fallback inteligente
-    const fallbackCategory = isExpense ? 'Sin clasificar' : 'Ingresos';
+    // Logs DEBUG protegidos
+    if (config.NODE_ENV !== 'production') {
+      console.log('DEBUG: Categorize Input:', JSON.stringify(input, null, 2));
+      console.log('DEBUG: Rule Match:', JSON.stringify(rule, null, 2));
+      console.log('DEBUG: AI Confidence Threshold:', effectiveMinConfidence);
+    }
+    
+    // Fallback heurístico
+    const fallbackCategory = isExpense ? FALLBACK_EXPENSE : FALLBACK_INCOME;
     result = {
       category: fallbackCategory,
       confidence: 0.4,
       reasons: ['fallback:heuristic'],
       merchant_clean,
-      dedupHash: common.dedupHash,
+      dedupHash: hash,
       aiEnhanced: false
     };
   }
@@ -268,12 +252,20 @@ export async function categorizeBatch(
       } catch (error) {
         console.error(`Error categorizing transaction ${i}:`, error);
         // Retornar categorización por defecto en caso de error
+        const merchantClean = normalizeMerchant(input.merchant || '');
+        const errorHash = dedupHash({
+          amount: input.amount,
+          when: input.when,
+          merchant_clean: merchantClean,
+          accountLast4: input.accountLast4,
+          bankMessageId: input.bankMessageId
+        });
         return {
           category: 'Sin clasificar',
           confidence: 0.1,
           reasons: ['error:processing'],
-          merchant_clean: '',
-          dedupHash: '',
+          merchant_clean: merchantClean,
+          dedupHash: errorHash,
           aiEnhanced: false
         };
       }
