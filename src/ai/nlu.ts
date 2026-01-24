@@ -549,6 +549,7 @@ IMPORTANTE - MÉTODO DE PAGO Y CUOTAS:
   * Establecer paymentMethod: "credito"
   * Dentro de creditDetails, extraer installments (el número de cuotas)
   * Si menciona interés (ej: "10% de interés"), extraer interestRate: 10
+- Si no se especifica: paymentMethod: "efectivo" (default)
 
 IMPORTANTE - CUENTA:
 - Si menciona nombre específico de banco o fintech: usar ese nombre exacto (ej: "Ualá", "Mercado Pago", "Brubank", "Naranja X", "Galicia", "Santander", "BBVA", "Macro", "Nación")
@@ -556,6 +557,7 @@ IMPORTANTE - CUENTA:
 - Si menciona "efectivo", "cash", "en mano": account: "Efectivo"
 - Si menciona "tarjeta" sin especificar: account: "Tarjeta"
 - Si menciona "billetera virtual", "wallet": extraer nombre específico (ej: "Mercado Pago", "Personal Pay")
+- Si no se especifica: account: "Efectivo" (default)
 - CONTEXTO ARGENTINO: "Ualá", "Mercado Pago", "Brubank", "Naranja X" son cuentas/tarjetas prepagas comunes
 
 IMPORTANTE - NOMBRE DE CUENTA (PARA create_account):
