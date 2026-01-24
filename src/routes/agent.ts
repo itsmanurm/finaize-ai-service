@@ -57,7 +57,8 @@ r.post('/forecast', async (req, res) => {
     }
 
     // Usar el nuevo servicio de proyección intra-mensual
-    const result = ForecastingService.predictIntraMonth(currentMonthData, daysInMonth);
+    // Pasamos historia vacía [] para que confíe en los datos actuales
+    const result = ForecastingService.predictAdaptive([], currentMonthData, daysInMonth, daysElapsed);
 
     // Map to API response structure
     // historySmoothed -> Real Cumulative
@@ -65,7 +66,7 @@ r.post('/forecast', async (req, res) => {
 
     res.json({
       ok: true,
-      historySmoothed: result.movingAverage, // Contains cumulativeReal
+      historySmoothed: currentMonthData, // Using the real data we generated
       forecast: result
     });
 
