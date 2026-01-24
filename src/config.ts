@@ -17,5 +17,5 @@ export const config = {
   PORT: Number(process.env.PORT ?? 8081),
   CORS_ORIGIN: process.env.CORS_ORIGIN || '*',
   RATE_LIMIT_PER_MIN: Number(process.env.RATE_LIMIT_PER_MIN ?? 120),
-  BACKEND_URL: process.env.BACKEND_URL || 'http://localhost:3000',
+  BACKEND_URL: process.env.BACKEND_URL || 'http://localhost:4000',
 };
