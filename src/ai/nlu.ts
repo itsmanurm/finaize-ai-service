@@ -30,6 +30,11 @@ export type Entities = {
   goalName?: string;
   items?: any[];
   description?: string;
+  // Purchase Advice
+  item?: string;
+  installments?: number;
+  interest_free?: boolean;
+  interest_rate?: number;
   // extensible: puedes agregar más campos según lo que devuelva OpenAI
 };
 
@@ -63,6 +68,10 @@ const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
 
   // Cotización dólar
   { name: 'query_dollar_rate', re: /\b(d[oó]lar|cotizaci[oó]n|precio del d[oó]lar|blue|mep|ccl|contado con liquidaci[oó]n|tipo de cambio|cu[aá]nto est[aá] el d[oó]lar|valor del d[oó]lar|d[oó]lar hoy|d[oó]lar actual)\b/i },
+
+  // Asesoría de compra (Purchase Advice)
+  { name: 'purchase_advice', re: /(puedo|conviene|vale la pena|idea|querr[ií]a|gustar[ií]a).*(comprar|comprarme)/i },
+  { name: 'purchase_advice', re: /(comprar|comprarme).*(conviene|alcanza|puedo|pena|pensas)/i },
 
   // Análisis de perfil
   { name: 'analyze_financial_profile', re: /\b(mi perfil|perfil financiero|analiza mi comportamiento|cómo gasto|cómo es mi gasto|mis hábitos de gasto|mi salud financiera|qué tipo de gastador|mi situación financiera|análisis de mis|estudia mi patrón)\b/i },
@@ -200,12 +209,30 @@ export async function parseMessage(message: string): Promise<NLUResult> {
   if (/transfer[ií]/i.test(message)) {
     entities.category = 'transferencia';
   }
-  // Monto
-  const amountMatch = message.match(/([+-]?\d+[\d,.]*)/);
-  if (amountMatch) entities.amount = Number(amountMatch[1].replace(/,/g, ''));
+  // Monto - Manejo de formato argentino (puntos como miles, comas opcionales)
+  const amountMatch = message.match(/\b(\d+(?:\.\d{3})*(?:,\d+)?)\b/);
+  if (amountMatch) {
+    const raw = amountMatch[1];
+    // Reemplazar puntos (miles) por nada, y comas (decimales) por puntos
+    const normalized = raw.replace(/\./g, '').replace(/,/g, '.');
+    entities.amount = parseFloat(normalized);
+  }
+
+  // installments (cuotas) - detección básica rule-based
+  const installmentsMatch = message.match(/(\d+)\s+cuotas/i) || message.match(/en\s+(\d+)\s+(?:cuotas|pagos|meses)/i);
+  if (installmentsMatch) {
+    entities.installments = parseInt(installmentsMatch[1], 10);
+  }
+
   // Moneda
-  const currencyMatch = message.match(/\b(ARS|USD|EUR|pesos?|d[oó]lares?|euros?)\b/i);
+  const currencyMatch = message.match(/\b(ARS|USD|EUR|pesos?|d[oó]lares?|euros?|pesitos)\b/i);
   if (currencyMatch) entities.currency = currencyMatch[1].toUpperCase();
+
+  // Item para purchase_advice (heurística simple: lo que sigue a "comprar" o "comprarme")
+  const itemMatch = message.match(/(?:comprar|comprarme)\s+(?:una?|el|la)?\s*([A-Za-záéíóúüñ\s]+?)(?:\s+de|\s+en|\s+por|\s+con|\s+\?|\s*\.|$)/i);
+  if (itemMatch) {
+    entities.item = itemMatch[1].trim();
+  }
   // Comercio (merchant) vs Categoría
   // IMPORTANTE: Distinguir entre "en transporte" (categoría) vs "en Carrefour" (merchant)
   // Categorías comunes que el usuario menciona
@@ -288,6 +315,24 @@ export async function parseMessage(message: string): Promise<NLUResult> {
     }
   }
 
+  // Rule-based first, pero si no hay match exacto, priorizar fallback a OpenAI
+  let matchedIntent = null;
+  for (const r of INTENT_RULES) {
+    if (r.re.test(message)) {
+      matchedIntent = r.name;
+      logNLU('info', `Intent matched by rule: ${r.name}`);
+      break;
+    }
+  }
+
+  // Si el intent es "accion directa" o coincide con una regla específica de alta importancia (como purchase_advice)
+  // DEBEMOS RETORNAR ANTES de que el heurístico de "múltiples montos" lo confunda con una lista de gastos.
+  const HIGH_PRIORITY_INTENTS = ['purchase_advice', 'query_dollar_rate', 'query_market_info', 'analyze_financial_profile', 'query_top_expenses'];
+  if (matchedIntent && HIGH_PRIORITY_INTENTS.includes(matchedIntent)) {
+    logNLU('info', `High priority intent detected, skipping multi-item heuristic: ${matchedIntent}`);
+    return { intent: matchedIntent, confidence: 0.95, entities: normalizeEntities(entities) };
+  }
+
   // Detectar montos (puede haber múltiples montos en un solo mensaje)
   // Usar una versión limpia del mensaje para evitar detectar la fecha "el 1" como monto 1
   let msgForAmounts = message;
@@ -307,7 +352,7 @@ export async function parseMessage(message: string): Promise<NLUResult> {
     return true;
   });
   // Si hay múltiples montos y NO menciona "presupuesto", pedir a OpenAI que devuelva un array estructurado de items
-  if (realAmounts && realAmounts.length > 1 && !/presupuesto/i.test(message)) {
+  if (realAmounts && realAmounts.length > 1 && !/presupuesto|cuota|pago/i.test(message)) {
     const apiKey2 = config.OPENAI_API_KEY;
     if (!apiKey2) {
       // Fallback heurístico si no hay OpenAI key
@@ -404,17 +449,6 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
     return { intent: 'add_expense_list', confidence: 0.6, entities: normalizeEntities({ ...entities, items: items2 }) };
   }
 
-  // Rule-based first, pero si no hay match exacto, priorizar fallback a OpenAI
-  let matchedIntent = null;
-  for (const r of INTENT_RULES) {
-    if (r.re.test(message)) {
-      matchedIntent = r.name;
-      logNLU('info', `Intent matched by rule: ${r.name}`);
-      break;
-    }
-  }
-  // intent detection via rules
-
   // Para intents de "acción directa" que no necesitan OpenAI, retornar inmediatamente
   const DIRECT_ACTION_INTENTS = ['query_dollar_rate', 'query_market_info', 'analyze_financial_profile', 'query_top_expenses'];
   if (matchedIntent && DIRECT_ACTION_INTENTS.includes(matchedIntent)) {
@@ -445,6 +479,7 @@ ENTIDADES A EXTRAER SEGÚN EL INTENT:
 - Para metas: amount, currency, description, goalName, categories (array de strings), deadline (fecha límite si se menciona), year, month
 - Para cuentas: name (IMPORTANTE: extraer el nombre específico del banco o institución mencionada, NO "nueva cuenta" ni palabras genéricas. Ej: "banco nacion", "Galicia", "BBVA", "Efectivo"), type ("cash", "bank", "card", "investment"), currency, primary, reconciled, archived
 - Para categorías: name, type ("income" o "expense"), icon, color
+- Para asesoría de compra (purchase_advice): item (nombre del producto), amount (precio total), installments (número de cuotas), interest_free (boolean, true si explícitamente dice sin interés o s/i), interest_rate (número, porcentaje de interés anual o mensual especificado)
 
 IMPORTANTE - MONTOS Y FORMATO ARGENTINO:
 - Extraer solo el número del monto, sin puntos ni comas
@@ -544,6 +579,7 @@ REGLAS ADICIONALES:
 - Si el usuario menciona crear una cuenta bancaria o billetera, responde con intent "create_account" y extrae name, type, currency, primary (falso por defecto), reconciled (falso por defecto), archived (falso por defecto).
 - Si el usuario menciona crear una categoría nueva, responde con intent "create_category" y extrae name, type ("income" o "expense"), icon, color.
 - Si el usuario menciona invertir, comprar activos CON monto específico, responde con intent "invest" y extrae activo, amount, currency, periodo, tipo.
+- Si el usuario pregunta si puede o le conviene comprar algo, o pide consejo sobre una compra grande (GENERALMENTE usa futuro o condicional: "¿puedo?", "¿conviene?", "¿podría?", "¿me alcanzaría?"), responde con intent "purchase_advice" y extrae item, amount, installments, interest_free e interest_rate.
 - Si el usuario menciona GASTOS, pagos, compras, retiros, extracciones, transferencias a terceros (ej: "gasté", "pagué", "compré", "saqué plata", "retiré", "extraje", "me cobraron", "salió", "salieron", "compro", "pago", "transferí a [persona/comercio]"), responde con intent "add_expense" y extrae amount, currency ('ARS' o 'USD'), merchant, category, description, year, month, day, account, paymentMethod (usar referencias temporales de arriba). 
 - REGLA CRÍTICA MERCHANT: NUNCA extraigas artículos ("un", "una", "el", "la", "unos", "unas") como merchant. Si el usuario dice "gasté 100 en un café", merchant debe ser "café" o estar vacío, NUNCA "un". 
 - CONTEXTO ARGENTINO: "saqué" generalmente significa retiro de cajero o gasto, NO ingreso.
@@ -552,6 +588,7 @@ REGLAS ADICIONALES:
 - Si el usuario pregunta por categorización, responde con intent "categorize".
 
 EJEMPLOS:
+- "¿Puedo comprarme una heladera de 800000 en 12 cuotas?" → {"intent": "purchase_advice", "confidence": 0.99, "entities": {"item": "heladera", "amount": 800000, "installments": 12, "currency": "ARS"}}
 - "¿Cuál es mi perfil financiero?" → {"intent": "analyze_financial_profile", "confidence": 0.99, "entities": {}}
 - "Analiza mi comportamiento de gastos" → {"intent": "analyze_financial_profile", "confidence": 0.98, "entities": {}}
 - "¿Cómo está mi salud financiera?" → {"intent": "analyze_financial_profile", "confidence": 0.98, "entities": {}}
