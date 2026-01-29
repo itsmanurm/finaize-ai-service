@@ -84,6 +84,172 @@ export async function actionQueryDollar() {
     return { ok: false, error: error.message, rates: [] };
   }
 }
+
+// Acción real: registrar ingreso
+export async function actionAddIncome(payload: { amount: number; account?: string; category?: string; token?: string }) {
+  const backendUrl = process.env.FINAIZE_BACKEND_URL || 'http://localhost:3001';
+  const { amount, account, token, category } = payload;
+
+  if (!token) return { ok: false, error: 'Auth required' };
+  if (!amount) return { ok: false, error: 'Monto requerido' };
+
+  try {
+    // 1. Get Accounts to validate or specific account
+    const accountsRes = await fetch(`${backendUrl}/api/accounts`, {
+      headers: { 'Authorization': buildBearer(token) }
+    });
+    const accounts = await accountsRes.json();
+
+    let targetAccount = null;
+    if (account) {
+      targetAccount = accounts.find((a: any) =>
+        a.name.toLowerCase().includes(account.toLowerCase())
+      );
+    } else {
+      // Default to primary or first
+      targetAccount = accounts.find((a: any) => a.primary) || accounts[0];
+    }
+
+    if (!targetAccount) {
+      // If no account found or ambiguous, arguably we could ask. 
+      // For now, if we can't find *any*, error.
+      return { ok: false, error: 'No se encontró una cuenta válida.' };
+    }
+
+    // If explicit account was requested but not found (logic above tries partial match), 
+    // strictly speaking we might want to be stricter. But let's rely on the find.
+
+    // 2. Create Transaction
+    const txPayload = {
+      amount: Math.abs(amount),
+      description: 'Ingreso registrado por IA',
+      category: category || 'Ingresos', // Default category
+      account: targetAccount.name,
+      transactionType: 'ingreso',
+      paymentMethod: 'efectivo', // Default
+      when: new Date().toISOString(),
+      confirmed: true
+    };
+
+    const res = await fetch(`${backendUrl}/api/transactions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': buildBearer(token),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(txPayload)
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      return { ok: false, error: err.message || 'Error creating transaction' };
+    }
+
+    const record = await res.json();
+    return { ok: true, record };
+
+  } catch (err: any) {
+    console.error('[actionAddIncome] Error:', err);
+    return { ok: false, error: err.message };
+  }
+}
+
+// Acción real: registrar gasto
+export async function actionAddExpense(payload: { amount: number; account?: string; category?: string; merchant?: string; token?: string }, forceCreation = false) {
+  const backendUrl = process.env.FINAIZE_BACKEND_URL || 'http://localhost:3001';
+  const { amount, account, token, category, merchant } = payload;
+
+  if (!token) return { ok: false, error: 'Auth required' };
+  if (!amount) return { ok: false, error: 'Monto requerido' };
+
+  try {
+    // 1. Validar cuentas disponibles
+    const accountsRes = await fetch(`${backendUrl}/api/accounts`, {
+      headers: { 'Authorization': buildBearer(token) }
+    });
+
+    if (!accountsRes.ok) return { ok: false, error: 'Error fetching accounts' };
+
+    const accounts = await accountsRes.json();
+    if (!accounts || accounts.length === 0) {
+      return { ok: false, error: 'No tenés cuentas registradas para asignar el gasto.' };
+    }
+
+    // 2. Determinar cuenta
+    let targetAccount;
+
+    if (account) {
+      // Si el usuario especificó cuenta, buscamos match
+      targetAccount = accounts.find((a: any) =>
+        a.name.toLowerCase().trim() === account.toLowerCase().trim()
+      );
+
+      // Si no hay match exacto, buscamos parcial
+      if (!targetAccount) {
+        targetAccount = accounts.find((a: any) =>
+          a.name.toLowerCase().includes(account.toLowerCase())
+        );
+      }
+    } else if (accounts.length === 1) {
+      // Si solo hay una cuenta, usar esa
+      targetAccount = accounts[0];
+    }
+
+    // 3. Fallback: Si no hay cuenta identificada, pedir al usuario seleccionarla
+    if (!targetAccount) {
+      return {
+        ok: true,
+        requiresAccountSelection: true,
+        availableAccounts: accounts, // Pasamos la lista para que el usuario elija
+        message: `Tengo el gasto de $${amount}, pero ¿a qué cuenta debería cargarlo?`,
+        pendingTransaction: payload // Guardamos el payload original para reintentar luego
+      };
+    }
+
+    // 4. Crear Transacción
+    const txPayload = {
+      amount: Math.abs(amount), // Ensure positive for storage unless logic differs
+      description: merchant || category || 'Gasto registrado por IA',
+      category: category || 'Sin clasificar',
+      account: targetAccount.name,
+      accountId: targetAccount._id, // Adding ID helps backend
+      transactionType: 'egreso',
+      paymentMethod: 'efectivo',
+      when: new Date().toISOString(),
+      confirmed: true
+    };
+
+    const res = await fetch(`${backendUrl}/api/transactions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': buildBearer(token),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(txPayload)
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      return { ok: false, error: err.message || 'Error creating transaction' };
+    }
+
+    const record = await res.json();
+
+    // Warning logic (saldo duplicado/etc handled by backend ideally, or we add warning if response suggests it)
+    let warning = '';
+
+    return { ok: true, record, warning };
+
+  } catch (err: any) {
+    console.error('[actionAddExpense] Error:', err);
+    return { ok: false, error: err.message };
+  }
+}
+
+// Alias for compatibility if needed, though we export individually
+export const actionQuerySummary = querySummary;
+
+
 // Helper de normalización reutilizable
 function normalize(str: string = '') {
   return String(str)
