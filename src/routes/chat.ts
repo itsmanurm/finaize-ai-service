@@ -1,7 +1,8 @@
 import { Router } from 'express';
-import { ensureSession, appendMessage } from '../ai/session';
+import { ensureSession, appendMessage, storePendingTransaction, getPendingTransaction, clearPendingTransaction } from '../ai/session';
 import { parseMessage } from '../ai/nlu';
-import { actionAddExpense, actionQuerySummary, actionQueryDollar } from '../ai/actions';
+import { actionAddExpense, actionQuerySummary, actionQueryDollar, actionAddIncome } from '../ai/actions';
+
 
 const r = Router();
 
@@ -39,7 +40,7 @@ r.post('/chat', async (req, res) => {
     ];
     const actionsMap: Record<string, Function> = {
       add_expense: actionAddExpense,
-      add_income: require('../ai/actions').actionAddIncome,
+      add_income: actionAddIncome,
       query_summary: actionQuerySummary,
       query_top_expenses: actionQuerySummary,
       query_dollar_rate: actionQueryDollar,
@@ -47,7 +48,59 @@ r.post('/chat', async (req, res) => {
       categorize: async () => ({ ok: true })
     };
 
+    // CHECK FOR PENDING TRANSACTION (User selecting account)
+    const pendingTx = getPendingTransaction(session.id);
+    if (pendingTx) {
+      // Check if message is a number selection (1, 2, 3, etc.)
+      const numberMatch = message.trim().match(/^(\d+)$/);
+      let selectedAccountIndex = -1;
+
+      if (numberMatch) {
+        selectedAccountIndex = parseInt(numberMatch[1]) - 1; // Convert to 0-indexed
+      } else {
+        // Check if message contains account name
+        const accountNameLower = message.toLowerCase();
+        selectedAccountIndex = pendingTx.availableAccounts.findIndex((acc: any) =>
+          accountNameLower.includes(acc.name.toLowerCase())
+        );
+      }
+
+      if (selectedAccountIndex >= 0 && selectedAccountIndex < pendingTx.availableAccounts.length) {
+        // Valid selection - create transaction with selected account
+        const selectedAccount = pendingTx.availableAccounts[selectedAccountIndex];
+
+        const finalPayload = {
+          ...pendingTx.transactionData,
+          account: selectedAccount.name,
+          token: req.headers.authorization
+        };
+
+        // Determine if it's expense or income based on transaction data
+        const isIncome = pendingTx.transactionData.source || pendingTx.transactionData.category === 'Ingreso';
+        const actionFn = isIncome ? actionAddIncome : actionAddExpense;
+
+        actionResult = await actionFn(finalPayload);
+
+        if (actionResult.ok && actionResult.record) {
+          reply = `✅ Transacción registrada en **${selectedAccount.name}**: ${actionResult.record.currency} ${actionResult.record.amount}`;
+        } else {
+          reply = 'Hubo un error al registrar la transacción. Intentá de nuevo.';
+        }
+
+        clearPendingTransaction(session.id);
+
+        appendMessage(session.id, 'bot', reply);
+        return res.json({ ok: true, sessionId: session.id, intent: 'account_selected', confidence: 1.0, reply, actionResult });
+      } else {
+        // Invalid selection
+        reply = `No entendí tu selección. Por favor, elegí un número entre 1 y ${pendingTx.availableAccounts.length}.`;
+        appendMessage(session.id, 'bot', reply);
+        return res.json({ ok: false, sessionId: session.id, intent: 'invalid_selection', confidence: 0, reply });
+      }
+    }
+
     let actionFn: Function | undefined = actionsMap[nlu.intent];
+
     // Si el intent contiene alguna palabra clave de mercado, usar queryMarketInfo
     if (!actionFn && marketKeywords.some(k => nlu.intent?.toLowerCase().includes(k))) {
       actionFn = require('../ai/actions').queryMarketInfo;
@@ -70,13 +123,37 @@ r.post('/chat', async (req, res) => {
       else reply = 'No se pudieron registrar los gastos.';
     } else if (nlu.intent && actionFn) {
       // Pasar entidades extraídas como opciones de filtrado, incluyendo info de sesión/auth
-      const opts = { 
-        ...options, 
-        ...nlu.entities, 
+      const opts = {
+        ...options,
+        ...nlu.entities,
         intent: nlu.intent,
         token: req.headers.authorization // Pasar token para validaciones contra backend
       };
       actionResult = await actionFn(opts);
+
+      // HANDLE ACCOUNT SELECTION REQUIREMENT
+      if (actionResult.requiresAccountSelection) {
+        // Store pending transaction in session
+        storePendingTransaction(
+          session.id,
+          actionResult.pendingTransaction,
+          actionResult.requestedAccount,
+          actionResult.availableAccounts
+        );
+
+        // Build reply with numbered account options
+        reply = actionResult.message + '\n\n';
+        actionResult.availableAccounts.forEach((acc: any, idx: number) => {
+          const balanceInfo = acc.balance !== undefined ? ` - Saldo: ${acc.currency} ${acc.balance.toLocaleString('es-AR')}` : '';
+          reply += `${idx + 1}. **${acc.name}** (${acc.type}, ${acc.currency})${balanceInfo}\n`;
+        });
+        reply += '\n_Respondé con el número de la cuenta que querés usar._';
+
+        // Return early - don't process other intent handlers
+        appendMessage(session.id, 'bot', reply);
+        return res.json({ ok: true, sessionId: session.id, intent: nlu.intent, confidence: nlu.confidence, reply, actionResult });
+      }
+
       // Respuesta adaptada según intent
       if (nlu.intent === 'add_expense') {
         reply = `Gasto registrado: ${actionResult.record.category} ${actionResult.record.amount} ${actionResult.record.currency}`;
@@ -88,11 +165,12 @@ r.post('/chat', async (req, res) => {
         if (actionResult.warning) {
           reply += `\n\n${actionResult.warning}`;
         }
+
       } else if (nlu.intent === 'query_summary') {
         reply = `Resumen: ingreso ${actionResult.totals.income}, gasto ${actionResult.totals.expense}, neto ${actionResult.totals.net}`;
       } else if (nlu.intent === 'query_top_expenses') {
         if (actionResult.topExpenses && actionResult.topExpenses.length) {
-              reply = 'Tus gastos más altos este mes fueron: ' + actionResult.topExpenses.map((e: any) => `${e.description} (${e.amount} ${e.currency})`).join(', ');
+          reply = 'Tus gastos más altos este mes fueron: ' + actionResult.topExpenses.map((e: any) => `${e.description} (${e.amount} ${e.currency})`).join(', ');
         } else {
           reply = 'No se encontraron gastos altos este mes.';
         }
@@ -102,20 +180,20 @@ r.post('/chat', async (req, res) => {
         reply = 'Puedes enviarme la transacción y la categorizo.';
       } else if (actionFn === require('../ai/actions').queryMarketInfo) {
         if (actionResult.ok && actionResult.activos?.length) {
-              reply = `Los mejores ${actionResult.activos[0].nombre.includes('Apple') ? 'CEDEARs' : 'activos'} ${actionResult.periodo} son: ` + actionResult.activos.map((a: any) => `${a.nombre} (${a.variacion}, $${a.precio})`).join(', ');
+          reply = `Los mejores ${actionResult.activos[0].nombre.includes('Apple') ? 'CEDEARs' : 'activos'} ${actionResult.periodo} son: ` + actionResult.activos.map((a: any) => `${a.nombre} (${a.variacion}, $${a.precio})`).join(', ');
         } else {
           reply = 'No se encontraron activos destacados para tu consulta.';
         }
       } else if (nlu.intent === 'query_dollar_rate') {
         if (actionResult.ok && actionResult.rates?.length) {
-          const ratesText = actionResult.rates.map((r: any) => 
+          const ratesText = actionResult.rates.map((r: any) =>
             `${r.nombre}: Compra $${r.compra?.toLocaleString('es-AR') || 'N/A'}, Venta $${r.venta?.toLocaleString('es-AR') || 'N/A'}`
           ).join(' | ');
           reply = `💵 Cotizaciones del dólar:\n${ratesText}`;
         } else {
           reply = 'No pude obtener las cotizaciones del dólar en este momento. Intentá de nuevo en unos minutos.';
         }
-      } else if (nlu.intent === 'help' || message.toLowerCase().includes('ayudar')|| message.toLowerCase().includes('podes hacer') || message.toLowerCase().includes('puedes hacer')) {
+      } else if (nlu.intent === 'help' || message.toLowerCase().includes('ayudar') || message.toLowerCase().includes('podes hacer') || message.toLowerCase().includes('puedes hacer')) {
         reply = `¡Hola! Soy tu **Asistente Financiero con IA** 🤖✨
 
 **Puedo ayudarte con:**

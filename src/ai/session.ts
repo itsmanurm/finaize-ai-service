@@ -47,3 +47,39 @@ export function ensureSession(id?: string) {
 export function clearSession(id: string) {
   return SESSIONS.delete(id);
 }
+
+// ============================================
+// Pending Transaction Management
+// ============================================
+
+interface PendingTransaction {
+  transactionData: any;
+  requestedAccount: string;
+  availableAccounts: any[];
+  timestamp: Date;
+}
+
+const PENDING_TRANSACTIONS = new Map<string, PendingTransaction>();
+
+export function storePendingTransaction(
+  sessionId: string,
+  transactionData: any,
+  requestedAccount: string,
+  availableAccounts: any[]
+) {
+  PENDING_TRANSACTIONS.set(sessionId, {
+    transactionData,
+    requestedAccount,
+    availableAccounts,
+    timestamp: new Date()
+  });
+}
+
+export function getPendingTransaction(sessionId: string): PendingTransaction | undefined {
+  return PENDING_TRANSACTIONS.get(sessionId);
+}
+
+export function clearPendingTransaction(sessionId: string) {
+  PENDING_TRANSACTIONS.delete(sessionId);
+}
+

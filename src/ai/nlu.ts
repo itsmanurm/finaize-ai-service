@@ -115,7 +115,7 @@ const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
 
 export async function parseMessage(message: string): Promise<NLUResult> {
   // Normalización de entidades para downstream
-  function normalizeEntities(e: Entities): Entities {
+  function normalizeEntities(e: Entities, intent: string): Entities {
     const out: Entities = { ...e };
     // period: 'mes_actual' → period: 'mes', month/year actual
     if (out.period === 'mes_actual') {
@@ -141,6 +141,12 @@ export async function parseMessage(message: string): Promise<NLUResult> {
       if (out.category === 'transferencias') out.category = 'transferencia';
       if (out.category === 'supermercados') out.category = 'supermercado';
       if (out.category === 'restaurantes') out.category = 'restaurante';
+
+      // Si es un ingreso, evitar categorías de gasto comunes mal detectadas
+      const commonWallets = ['mercado pago', 'mercado', 'uala', 'brubank', 'personal pay', 'naranja', 'lemon'];
+      if (intent === 'add_income' && commonWallets.includes(out.category.toLowerCase())) {
+        out.category = 'Ingreso';
+      }
     }
     // activo normalización
     if (out.activo) {
@@ -242,18 +248,26 @@ export async function parseMessage(message: string): Promise<NLUResult> {
     'ropa', 'zapatos', 'ropa deportiva', 'deportes', 'fitness', 'salud', 'médico',
     'educación', 'cursos', 'libros', 'tecnología', 'electrónica', 'casa', 'muebles',
     'limpieza', 'higiene', 'belleza', 'peluquería', 'masajes', 'viajes', 'hotel', 'vuelos',
-    'seguros', 'impuestos', 'suscripciones', 'streaming', 'música', 'juegos', 'mascotas'
+    'seguros', 'impuestos', 'suscripciones', 'streaming', 'música', 'juegos', 'mascotas',
+    'sueldo', 'ingreso', 'venta', 'honorarios', 'regalo', 'transferencia'
   ];
+
+  const commonWallets = ['mercado pago', 'mercado', 'uala', 'brubank', 'lemon', 'naranja', 'personal pay', 'modo'];
 
   let merchant = '';
   let category = '';
 
   // Buscar en el mensaje patrones como "en [CATEGORIA]" o "en [MERCHANT]"
-  const enPattern = message.match(/en\s+([A-Za-z0-9áéíóúüñ\-]+)(?:\s|,|\?|$)/i);
+  // Mejorar regex para capturar hasta 2-3 palabras
+  const enPattern = message.match(/en\s+([A-Za-z0-9áéíóúüñ\-]+(?:\s+[A-Za-z0-9áéíóúüñ\-]+)?)(?:\s|,|\?|$)/i);
   if (enPattern) {
-    const candidato = enPattern[1].toLowerCase();
-    // Si es una categoría conocida, guardar como category
-    if (knownCategories.some(c => candidato.includes(c) || c.includes(candidato))) {
+    const candidato = enPattern[1].toLowerCase().trim();
+
+    // Si el candidato es una billetera conocida, es MERCHANT o ACCOUNT, no categoría
+    const isWallet = commonWallets.some(w => candidato.includes(w) || w.includes(candidato));
+
+    // Si es una categoría conocida y NO es una billetera
+    if (!isWallet && knownCategories.some(c => candidato === c || (candidato.length > 3 && c.startsWith(candidato)))) {
       category = candidato;
     } else {
       // Si no, es un merchant
@@ -330,7 +344,7 @@ export async function parseMessage(message: string): Promise<NLUResult> {
   const HIGH_PRIORITY_INTENTS = ['purchase_advice', 'query_dollar_rate', 'query_market_info', 'analyze_financial_profile', 'query_top_expenses'];
   if (matchedIntent && HIGH_PRIORITY_INTENTS.includes(matchedIntent)) {
     logNLU('info', `High priority intent detected, skipping multi-item heuristic: ${matchedIntent}`);
-    return { intent: matchedIntent, confidence: 0.95, entities: normalizeEntities(entities) };
+    return { intent: matchedIntent, confidence: 0.95, entities: normalizeEntities(entities, matchedIntent) };
   }
 
   // Detectar montos (puede haber múltiples montos en un solo mensaje)
@@ -374,7 +388,7 @@ export async function parseMessage(message: string): Promise<NLUResult> {
         }
         items.push({ description: desc || undefined, amount: amt, currency, merchant: merchant || undefined });
       }
-      return { intent: 'add_expense_list', confidence: 0.6, entities: normalizeEntities({ ...entities, items }) };
+      return { intent: 'add_expense_list', confidence: 0.6, entities: normalizeEntities({ ...entities, items }, 'add_expense_list') };
     }
 
     // Construir prompt especializado para extraer múltiples items
@@ -391,7 +405,7 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.0,
-        max_tokens: 400
+        max_completion_tokens: 400
       });
 
       const content = completion.choices?.[0]?.message?.content || '';
@@ -416,7 +430,7 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
           return {
             intent: parsed.intent || 'add_expense_list',
             confidence: parsed.confidence || 0.95,
-            entities: normalizeEntities({ ...entities, ...(parsedEntities || {}) })
+            entities: normalizeEntities({ ...entities, ...(parsedEntities || {}) }, parsed.intent || 'add_expense_list')
           };
         } catch (e) {
           console.warn('[NLU] Error parseando JSON OpenAI para multi-items:', e);
@@ -446,14 +460,14 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
       }
       items2.push({ description: desc || undefined, amount: amt, currency, merchant: merchant || undefined });
     }
-    return { intent: 'add_expense_list', confidence: 0.6, entities: normalizeEntities({ ...entities, items: items2 }) };
+    return { intent: 'add_expense_list', confidence: 0.6, entities: normalizeEntities({ ...entities, items: items2 }, 'add_expense_list') };
   }
 
   // Para intents de "acción directa" que no necesitan OpenAI, retornar inmediatamente
   const DIRECT_ACTION_INTENTS = ['query_dollar_rate', 'query_market_info', 'analyze_financial_profile', 'query_top_expenses'];
   if (matchedIntent && DIRECT_ACTION_INTENTS.includes(matchedIntent)) {
     logNLU('info', `Direct action intent detected, skipping OpenAI: ${matchedIntent}`);
-    return { intent: matchedIntent, confidence: 0.95, entities: normalizeEntities(entities) };
+    return { intent: matchedIntent, confidence: 0.95, entities: normalizeEntities(entities, matchedIntent) };
   }
 
   // Si no hay match, o la confianza es baja, usar OpenAI
@@ -539,7 +553,7 @@ IMPORTANTE - MÉTODO DE PAGO Y CUOTAS:
   * Establecer paymentMethod: "credito"
   * Dentro de creditDetails, extraer installments (el número de cuotas)
   * Si menciona interés (ej: "10% de interés"), extraer interestRate: 10
-- Si no se especifica: paymentMethod: "efectivo" (default)
+- Si no se especifica: NO incluir el campo paymentMethod en entities
 
 IMPORTANTE - CUENTA:
 - Si menciona nombre específico de banco o fintech: usar ese nombre exacto (ej: "Ualá", "Mercado Pago", "Brubank", "Naranja X", "Galicia", "Santander", "BBVA", "Macro", "Nación")
@@ -547,7 +561,7 @@ IMPORTANTE - CUENTA:
 - Si menciona "efectivo", "cash", "en mano": account: "Efectivo"
 - Si menciona "tarjeta" sin especificar: account: "Tarjeta"
 - Si menciona "billetera virtual", "wallet": extraer nombre específico (ej: "Mercado Pago", "Personal Pay")
-- Si no se especifica: account: "Efectivo" (default)
+- Si no se especifica: NO incluir el campo account en entities
 - CONTEXTO ARGENTINO: "Ualá", "Mercado Pago", "Brubank", "Naranja X" son cuentas/tarjetas prepagas comunes
 
 IMPORTANTE - NOMBRE DE CUENTA (PARA create_account):
@@ -604,7 +618,8 @@ EJEMPLOS:
 - "Compré tornillos por 500" → {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 500, "currency": "ARS", "category": "Tornillos", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
 - "Saqué 5000 del cajero" → {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 5000, "currency": "ARS", "category": "Retiro", "paymentMethod": "efectivo", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
 - "Pagué 2000 con Mercado Pago" → {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 2000, "currency": "ARS", "account": "Mercado Pago", "paymentMethod": "debito", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
-- "Me transfirieron 15000 al Brubank" → {"intent": "add_income", "confidence": 0.99, "entities": {"amount": 15000, "currency": "ARS", "account": "Brubank", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+- "Cobre 5000 en Mercado Pago" → {"intent": "add_income", "confidence": 0.99, "entities": {"amount": 5000, "currency": "ARS", "account": "Mercado Pago", "category": "Ingreso", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+- "Me transfirieron 15000 al Brubank" → {"intent": "add_income", "confidence": 0.99, "entities": {"amount": 15000, "currency": "ARS", "account": "Brubank", "category": "Ingreso", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
 - "Cobré el sueldo 120000" → {"intent": "add_income", "confidence": 0.99, "entities": {"amount": 120000, "currency": "ARS", "source": "sueldo", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
 - "Pagué la luz 8500" → {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 8500, "currency": "ARS", "category": "luz", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
 - "Fui al supermercado y gasté 2.300" → {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 2300, "currency": "ARS", "category": "supermercado", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
@@ -678,7 +693,7 @@ Mensaje: "${message}"`;
         { role: 'user', content: prompt }
       ],
       temperature: 0.0,
-      max_tokens: 400
+      max_completion_tokens: 400
     });
 
     const content = completion.choices?.[0]?.message?.content || '';
@@ -686,7 +701,7 @@ Mensaje: "${message}"`;
     // Validar que OpenAI retornó algo
     if (!content || content.trim().length === 0) {
       logNLU('warn', 'OpenAI returned empty content, using rule-based fallback');
-      return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.2, entities: normalizeEntities(entities) };
+      return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.2, entities: normalizeEntities(entities, matchedIntent || 'unknown') };
     }
 
     // Extraer JSON de la respuesta (puede estar embebido en texto)
@@ -702,21 +717,21 @@ Mensaje: "${message}"`;
         // Validar que al menos tenemos intent
         if (!parsed.intent) {
           logNLU('warn', 'OpenAI response missing intent field');
-          return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.3, entities: normalizeEntities(entities) };
+          return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.3, entities: normalizeEntities(entities, matchedIntent || 'unknown') };
         }
 
         return {
           intent: parsed.intent || matchedIntent || 'unknown',
           confidence: Math.min(1.0, Math.max(0, parsed.confidence || (matchedIntent ? 0.95 : 0.5))),
-          entities: normalizeEntities({ ...entities, ...(parsed.entities || {}) })
+          entities: normalizeEntities({ ...entities, ...(parsed.entities || {}) }, parsed.intent || matchedIntent || 'unknown')
         };
       } catch (e) {
         logNLU('warn', `JSON parse error: ${(e as any)?.message} `, { jsonText: jsonText.substring(0, 100) });
-        return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.3, entities: normalizeEntities(entities) };
+        return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.3, entities: normalizeEntities(entities, matchedIntent || 'unknown') };
       }
     } else {
       logNLU('warn', 'OpenAI response does not contain JSON, using rule fallback');
-      return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.2, entities: normalizeEntities(entities) };
+      return { intent: matchedIntent || 'unknown', confidence: matchedIntent ? 0.95 : 0.2, entities: normalizeEntities(entities, matchedIntent || 'unknown') };
     }
   } catch (err) {
     const errMsg = (err as any)?.message || String(err);
@@ -725,10 +740,10 @@ Mensaje: "${message}"`;
     // Fallback final: usar intent rule-based
     if (matchedIntent) {
       logNLU('info', `Using rule - based fallback intent: ${matchedIntent} `);
-      return { intent: matchedIntent, confidence: 0.8, entities: normalizeEntities(entities) };
+      return { intent: matchedIntent, confidence: 0.8, entities: normalizeEntities(entities, matchedIntent) };
     }
 
     // Si ni siquiera hay rule match, retornar unknown
-    return { intent: 'unknown', confidence: 0.2, entities: normalizeEntities(entities) };
+    return { intent: 'unknown', confidence: 0.2, entities: normalizeEntities(entities, 'unknown') };
   }
 }

@@ -145,9 +145,9 @@ function buildBearer(token?: string): string | undefined {
 
 function resolveSystemCashNames(accounts: any[]) {
   const ars = accounts.find((a: any) => a.type === 'cash' && a.currency === 'ARS' && a.isSystemAccount === true) ||
-              accounts.find((a: any) => a.type === 'cash' && a.currency === 'ARS');
+    accounts.find((a: any) => a.type === 'cash' && a.currency === 'ARS');
   const usd = accounts.find((a: any) => a.type === 'cash' && a.currency === 'USD' && a.isSystemAccount === true) ||
-              accounts.find((a: any) => a.type === 'cash' && a.currency === 'USD');
+    accounts.find((a: any) => a.type === 'cash' && a.currency === 'USD');
   return {
     arsName: ars?.name || 'Efectivo (ARS)',
     usdName: usd?.name || 'Efectivo (USD)'
@@ -217,11 +217,44 @@ export async function actionAddExpense(payload: { amount: number; currency?: str
   let warning = '';
   if (token) {
     const accounts = await getAccounts(token);
+
+    // VALIDATION: Check if the account exists (if it's not a default "Efectivo" account)
+    const isDefaultAccount = account.toLowerCase().includes('efectivo');
     const matched = accounts.find((a: any) => a.name.toLowerCase() === account.toLowerCase());
+
+    if (!matched && !isDefaultAccount && account) {
+      // Account doesn't exist - return selection options
+      const availableAccounts = accounts
+        .filter((a: any) => !a.archived)
+        .map((a: any) => ({
+          name: a.name,
+          type: a.type,
+          currency: a.currency,
+          balance: a.balance || 0
+        }));
+
+      return {
+        ok: false,
+        requiresAccountSelection: true,
+        requestedAccount: account,
+        availableAccounts,
+        pendingTransaction: {
+          amount,
+          currency,
+          merchant,
+          description,
+          when,
+          paymentMethod
+        },
+        message: `No encontré una cuenta llamada "${account}". ¿En cuál de estas cuentas querés registrar este gasto?`
+      };
+    }
+
     if (matched && matched.archived) {
       warning = `⚠️ *Atención*: La cuenta **${account}** está archivada.`;
     }
   }
+
 
   const categorized = await categorize({ description: description || '', merchant, amount, currency: currency as any });
 
@@ -314,11 +347,44 @@ export async function actionAddIncome(payload: { amount: number; currency?: stri
   let warning = '';
   if (token) {
     const accounts = await getAccounts(token);
+
+    // VALIDATION: Check if the account exists (if it's not a default "Efectivo" account)
+    const isDefaultAccount = account.toLowerCase().includes('efectivo');
     const matched = accounts.find((a: any) => a.name.toLowerCase() === account.toLowerCase());
+
+    if (!matched && !isDefaultAccount && account) {
+      // Account doesn't exist - return selection options
+      const availableAccounts = accounts
+        .filter((a: any) => !a.archived)
+        .map((a: any) => ({
+          name: a.name,
+          type: a.type,
+          currency: a.currency,
+          balance: a.balance || 0
+        }));
+
+      return {
+        ok: false,
+        requiresAccountSelection: true,
+        requestedAccount: account,
+        availableAccounts,
+        pendingTransaction: {
+          amount,
+          currency,
+          source,
+          description,
+          when,
+          category: payload.category
+        },
+        message: `No encontré una cuenta llamada "${account}". ¿En cuál de estas cuentas querés registrar este ingreso?`
+      };
+    }
+
     if (matched && matched.archived) {
       warning = `⚠️ *Atención*: La cuenta **${account}** está archivada.`;
     }
   }
+
 
   // Si se proporciona 'when', parsear esa fecha; si no, usar fecha actual de Argentina
   let timestamp: string;
