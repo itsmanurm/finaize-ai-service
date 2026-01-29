@@ -279,12 +279,12 @@ r.post('/forecast', async (req, res) => {
 
     // 2. Separar datos: Históricos (meses anteriores) vs Actuales (mes en curso)
     const now = new Date();
-    // Obtener string "YYYY-MM" local usando la fecha actual del sistema
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1; // 1-12
-    const currentMonthPrefix = `${currentYear} -${currentMonth.toString().padStart(2, '0')} `;
+    // Obtener "YYYY-MM" en UTC para coincidir con el backend
+    const currentYear = now.getUTCFullYear();
+    const currentMonth = now.getUTCMonth() + 1; // 1-12
+    const currentMonthPrefix = `${currentYear}-${currentMonth.toString().padStart(2, '0')}`;
 
-    console.log(`[AI - Service] Current Month Target: ${currentMonthPrefix} `);
+    console.log(`[AI-Service] Current Month Target: ${currentMonthPrefix}`);
 
     const historicalPointsMap = new Map<string, number>();
     const currentPointsMap = new Map<string, number>();
@@ -293,7 +293,6 @@ r.post('/forecast', async (req, res) => {
       const d = (t as any).date || t.when;
       if (!d) continue;
 
-      // d es string "YYYY-MM-DD" del backend
       let dateStr = '';
       if (d instanceof Date) {
         dateStr = d.toISOString().split('T')[0];
@@ -303,17 +302,18 @@ r.post('/forecast', async (req, res) => {
 
       const val = Math.abs(Number(t.amount) || 0);
 
-      // Comparación Estricta de String: Si empieza con "2026-01" es actual
+      // Comparación Estricta: Si empieza con "2026-01" es actual
       if (dateStr.startsWith(currentMonthPrefix)) {
         currentPointsMap.set(dateStr, (currentPointsMap.get(dateStr) || 0) + val);
       } else {
-        // Todo lo demás es historia
         historicalPointsMap.set(dateStr, (historicalPointsMap.get(dateStr) || 0) + val);
       }
     }
 
     const historicalData = Array.from(historicalPointsMap.entries()).map(([d, v]) => ({ date: new Date(d), value: v }));
     const currentData = Array.from(currentPointsMap.entries()).map(([d, v]) => ({ date: new Date(d), value: v }));
+
+    console.log(`[AI-Service] Forecast Split: History=${historicalData.length}, CurrentMonth=${currentData.length}`);
 
     const { ForecastingService } = await import('../ai/forecasting');
 

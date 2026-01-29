@@ -1,41 +1,52 @@
-// Acción mock: consulta de mercado/inversión
+const buildBearer = (token: string) => token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+
+// Acción real: consulta de mercado/inversión usando Backend
 export async function queryMarketInfo(payload: { activo?: string; period?: string; tipo?: string }) {
-  // Simulación de respuesta para CEDEARs, acciones, criptos
-  if (payload.activo === 'cedear') {
+  const backendUrl = process.env.FINAIZE_BACKEND_URL || 'http://localhost:3001';
+  let tickers: string[] = [];
+
+  const activo = normalize(payload.activo);
+
+  if (activo.includes('cedear') || activo.includes('accion')) {
+    tickers = ['AAPL', 'MELI', 'TSLA', 'GGAL', 'YPF'];
+  } else if (activo.includes('cripto')) {
+    tickers = ['BTC', 'ETH']; // Backend handles crypto via dedicated service or mapping
+    // Note: If backend doesn't support bare "BTC", we might need to adjust. 
+    // Assuming backend investment controller handles standard tickers.
+  } else {
+    // Default mixed
+    tickers = ['AAPL', 'BTC', 'MELI'];
+  }
+
+  try {
+    const promises = tickers.map(async t => {
+      try {
+        const res = await fetch(`${backendUrl}/api/investments/quote/${t}`);
+        if (res.ok) return await res.json();
+        return null;
+      } catch (e) { return null; }
+    });
+
+    const results = (await Promise.all(promises)).filter(Boolean);
+
+    // Map backend format to AI response expectation
+    const activos = results.map((r: any) => ({
+      nombre: r.symbol || r.name, // Adjust based on actual backend response
+      variacion: r.changePercent ? `${r.changePercent.toFixed(2)}%` : '0%',
+      precio: r.price || 0
+    }));
+
     return {
       ok: true,
-      activos: [
-        { nombre: 'Apple (AAPL)', variacion: '+2.1%', precio: 180 },
-        { nombre: 'Mercado Libre (MELI)', variacion: '+1.8%', precio: 1450 },
-        { nombre: 'Tesla (TSLA)', variacion: '+2.5%', precio: 240 }
-      ],
+      activos,
       periodo: payload.period || 'hoy',
-      tipo: payload.tipo || 'mejores'
+      tipo: payload.tipo || 'cotización'
     };
+
+  } catch (error) {
+    console.error('Error fetching market info:', error);
+    return { ok: false, error: 'Failed to fetch market data', activos: [] };
   }
-  if (payload.activo === 'criptomoneda') {
-    return {
-      ok: true,
-      activos: [
-        { nombre: 'Bitcoin', variacion: '+5.2%', precio: 65000 },
-        { nombre: 'Ethereum', variacion: '+3.8%', precio: 3400 }
-      ],
-      periodo: payload.period || 'semana',
-      tipo: payload.tipo || 'subiendo'
-    };
-  }
-  if (payload.activo === 'acción') {
-    return {
-      ok: true,
-      activos: [
-        { nombre: 'Globant', variacion: '+4.1%', precio: 210 },
-        { nombre: 'YPF', variacion: '+2.9%', precio: 12 }
-      ],
-      periodo: payload.period || 'mes',
-      tipo: payload.tipo || 'recomendación'
-    };
-  }
-  return { ok: false, activos: [], periodo: payload.period, tipo: payload.tipo };
 }
 
 /**
@@ -85,426 +96,139 @@ function normalize(str: string = '') {
     .replace(/\s+/g, '');
 }
 
-// Acción: obtener los mayores gastos (extraída a función para evitar side-effects en top-level)
-export async function queryTopExpenses(payload: { year?: number; month?: number } = {}) {
-  const fs = require('fs');
-  const path = require('path');
-  const filePath = path.join(process.cwd(), 'data', 'transactions.jsonl');
-  let lines: any[] = [];
-  try {
-    const raw = fs.readFileSync(filePath, 'utf8');
-    lines = raw.split('\n').filter(Boolean).map((l: string) => {
-      try { return JSON.parse(l); } catch { return null; }
-    }).filter(Boolean);
-  } catch { }
+// Acción real: obtener mayores gastos desde Backend
+export async function queryTopExpenses(payload: { year?: number; month?: number; token?: string }) {
+  const backendUrl = process.env.FINAIZE_BACKEND_URL || 'http://localhost:3001';
+  const { token, year, month } = payload;
 
-  // Filtrar por mes/año
-  let filtered = lines as any[];
-  if (payload?.year) {
-    const yearStr = payload.year.toString();
-    filtered = filtered.filter((it: any) => {
-      const d = it.when || it.date || it.ts;
-      return d && d.startsWith(yearStr);
-    });
-  }
-  if (payload?.month) {
-    const monthNum = payload.month;
-    filtered = filtered.filter((it: any) => {
-      const d = it.when || it.date || it.ts;
-      const m = d ? Number(d.split('-')[1]) : null;
-      return m === monthNum;
-    });
-  }
-
-  // Solo gastos (excluir transferencias internas)
-  filtered = filtered.filter((it: any) => {
-    // Excluir transferencias internas
-    if (it.isInternalTransfer === true || it.transactionType === 'transferencia') return false;
-    // Incluir solo egresos
-    return it.transactionType === 'egreso' || (Number(it.amount) > 0 && !it.transactionType);
-  });
-  // Ordenar por monto descendente y tomar top 3
-  const top = filtered.sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0)).slice(0, 3);
-  return {
-    ok: true,
-    topExpenses: top,
-    count: top.length,
-    filtro: { year: payload.year, month: payload.month }
-  };
-}
-import { appendJsonl } from '../utils/jsonl';
-import { categorize } from './enhanced-service';
-import { getArgentinaDate } from '../utils/date-parser';
-
-const BACKEND_URL = process.env.FINAIZE_BACKEND_URL || 'http://localhost:3001';
-
-function buildBearer(token?: string): string | undefined {
-  if (!token) return undefined;
-  return token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-}
-
-function resolveSystemCashNames(accounts: any[]) {
-  const ars = accounts.find((a: any) => a.type === 'cash' && a.currency === 'ARS' && a.isSystemAccount === true) ||
-    accounts.find((a: any) => a.type === 'cash' && a.currency === 'ARS');
-  const usd = accounts.find((a: any) => a.type === 'cash' && a.currency === 'USD' && a.isSystemAccount === true) ||
-    accounts.find((a: any) => a.type === 'cash' && a.currency === 'USD');
-  return {
-    arsName: ars?.name || 'Efectivo (ARS)',
-    usdName: usd?.name || 'Efectivo (USD)'
-  };
-}
-
-async function getAccounts(token?: string) {
   if (!token) {
-    console.warn('[actions] getAccounts: No token provided');
-    return [];
+    return { ok: false, error: 'Authentication required for Top Expenses', topExpenses: [] };
   }
+
   try {
-    const url = `${BACKEND_URL}/api/accounts?archived=all`;
-    console.log('[actions] Fetching accounts from:', url);
-    const res = await fetch(url, {
-      headers: { 'Authorization': buildBearer(token) as any }
+    // Construct date range for the month
+    const now = new Date();
+    const y = year || now.getFullYear();
+    const m = month || (now.getMonth() + 1);
+
+    // Start of month
+    const fromDate = new Date(y, m - 1, 1);
+    // End of month
+    const toDate = new Date(y, m, 0, 23, 59, 59);
+
+    const params = new URLSearchParams({
+      from: fromDate.toISOString(),
+      to: toDate.toISOString(),
+      transactionType: 'egreso'
     });
-    if (res.ok) {
-      const data = await res.json();
-      const accounts = Array.isArray(data) ? data : (data.accounts || []);
-      console.log(`[actions] Fetched ${accounts.length} accounts. Names:`, accounts.map((a: any) => `${a.name} (archived: ${a.archived})`).join(', '));
-      return accounts;
+
+    const res = await fetch(`${backendUrl}/api/transactions?${params.toString()}`, {
+      headers: { 'Authorization': buildBearer(token) as string }
+    });
+
+    if (!res.ok) {
+      console.error('[queryTopExpenses] Backend error:', res.status);
+      return { ok: false, error: 'Failed to fetch transactions', topExpenses: [] };
+    }
+
+    const transactions: any[] = await res.json();
+
+    // Filter and Sort (Backend returns list, we need top 3 by amount)
+    // Filter out internal transfers if any remain (backend usually handles this but safety check)
+    // And sort desc by amount
+    const top = transactions
+      .filter(t => t.transactionType === 'egreso' && !t.isInternalTransfer)
+      .sort((a: any, b: any) => b.amount - a.amount)
+      .slice(0, 3);
+
+    return {
+      ok: true,
+      topExpenses: top,
+      count: top.length,
+      filtro: { year, month }
+    };
+
+  } catch (error: any) {
+    console.error('[queryTopExpenses] Error:', error.message);
+    return { ok: false, error: error.message, topExpenses: [] };
+  }
+}
+
+// Acción real: obtener resumen de gastos desde Backend
+export async function querySummary(payload: { items?: any[]; classifyMissing?: boolean; currency?: string; periodLabel?: string; category?: string; merchant?: string; year?: number; month?: number; token?: string }) {
+  const backendUrl = process.env.FINAIZE_BACKEND_URL || 'http://localhost:3001';
+  const { token, category, merchant, year, month } = payload;
+
+  if (!token) {
+    return { ok: false, error: 'Authentication required for Summary', totals: { income: 0, expense: 0, net: 0 } };
+  }
+
+  try {
+    // Construct date range
+    const now = new Date();
+    const y = year || now.getFullYear();
+    const m = month || (now.getMonth() + 1);
+    const fromDate = new Date(y, m - 1, 1);
+    const toDate = new Date(y, m, 0, 23, 59, 59);
+
+    const params = new URLSearchParams({
+      from: fromDate.toISOString(),
+      to: toDate.toISOString()
+    });
+
+    if (category) params.append('category', category);
+    if (merchant) params.append('q', merchant); // Use q for merchant search as approx
+
+    // Fetch transactions to calculate totals
+    // Ideally we would use a summary endpoint, but /api/dashboard/summary logic might be different or fixed to specific views.
+    // Calculating from raw list ensures consistency with the previous "mock" logic which filtered the raw list.
+    const res = await fetch(`${backendUrl}/api/transactions?${params.toString()}`, {
+      headers: { 'Authorization': buildBearer(token) as string }
+    });
+
+    if (!res.ok) {
+      console.error('[querySummary] Backend error:', res.status);
+      return { ok: false, error: 'Failed to fetch data for summary' };
+    }
+
+    const transactions: any[] = await res.json();
+
+    let totalIncome = 0, totalExpense = 0;
+
+    // Logic: 
+    // If category is 'transferencia', sum all as expense? or split?
+    // Previous logic: if cat==transferencia, sum as expense.
+    const isTransferCat = category && normalize(category) === 'transferencia';
+
+    if (isTransferCat) {
+      totalExpense = transactions
+        .filter(t => normalize((t.category || {}).name || t.category || '') === 'transferencia')
+        .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
     } else {
-      console.error('[actions] Failed to fetch accounts. Status:', res.status);
-    }
-  } catch (err) {
-    console.warn('[actions] Failed to fetch accounts:', err);
-  }
-  return [];
-}
+      for (const t of transactions) {
+        // Exclude internal transfers 
+        if (t.isInternalTransfer === true) continue;
 
-export async function actionAddExpense(payload: { amount: number; currency?: string; merchant?: string; description?: string; when?: string; account?: string; paymentMethod?: string; token?: string }, persist = true) {
-  const { amount, currency = 'ARS', merchant, description, when, paymentMethod, token } = payload;
+        const val = Number(t.amount) || 0;
+        const type = t.transactionType; // 'ingreso', 'egreso'
 
-  // Resolve account based on currency and keywords
-  let account = payload.account || '';
-
-  // If we have a token, prefer exact system cash account names from backend
-  let systemNames: { arsName: string; usdName: string } | null = null;
-  if (token) {
-    const accounts = await getAccounts(token);
-    systemNames = resolveSystemCashNames(accounts);
-  }
-
-  // Normalize account name to lowercase for comparison
-  const accountLower = (account || '').toLowerCase().trim();
-
-  // Smart account resolution based on keywords first (overrides default currency if needed)
-  if (accountLower.includes('dolar') || accountLower.includes('usd') || accountLower.includes('verde')) {
-    account = systemNames?.usdName || 'Efectivo (USD)';
-    // Implicitly correct currency if needed, though strictly we stick to payload currency unless we want to auto-fix it too
-  } else if (accountLower.includes('peso') || accountLower.includes('ars')) {
-    account = systemNames?.arsName || 'Efectivo (ARS)';
-  } else if (currency === 'USD') {
-    // If currency is USD and account is generic or empty, default to Efectivo USD
-    if (accountLower === 'efectivo' || !accountLower) {
-      account = systemNames?.usdName || 'Efectivo (USD)';
-    }
-  } else {
-    // Default ARS/Generic
-    if (accountLower === 'efectivo' || !accountLower) {
-      account = systemNames?.arsName || 'Efectivo (ARS)';
-    }
-  }
-
-  // Check for archived account
-  let warning = '';
-  if (token) {
-    const accounts = await getAccounts(token);
-
-    // VALIDATION: Check if the account exists (if it's not a default "Efectivo" account)
-    const isDefaultAccount = account.toLowerCase().includes('efectivo');
-    const matched = accounts.find((a: any) => a.name.toLowerCase() === account.toLowerCase());
-
-    if (!matched && !isDefaultAccount && account) {
-      // Account doesn't exist - return selection options
-      const availableAccounts = accounts
-        .filter((a: any) => !a.archived)
-        .map((a: any) => ({
-          name: a.name,
-          type: a.type,
-          currency: a.currency,
-          balance: a.balance || 0
-        }));
-
-      return {
-        ok: false,
-        requiresAccountSelection: true,
-        requestedAccount: account,
-        availableAccounts,
-        pendingTransaction: {
-          amount,
-          currency,
-          merchant,
-          description,
-          when,
-          paymentMethod
-        },
-        message: `No encontré una cuenta llamada "${account}". ¿En cuál de estas cuentas querés registrar este gasto?`
-      };
-    }
-
-    if (matched && matched.archived) {
-      warning = `⚠️ *Atención*: La cuenta **${account}** está archivada.`;
-    }
-  }
-
-
-  const categorized = await categorize({ description: description || '', merchant, amount, currency: currency as any });
-
-  // Si se proporciona 'when', parsear esa fecha; si no, usar fecha actual de Argentina
-  let timestamp: string;
-  if (when) {
-    // Si 'when' ya es una fecha válida ISO, usarla; si no, parsearla
-    try {
-      const whenDate = new Date(when);
-      if (!isNaN(whenDate.getTime())) {
-        timestamp = whenDate.toISOString();
-      } else {
-        timestamp = getArgentinaDate().toISOString();
+        if (type === 'ingreso' || (val < 0 && !type)) {
+          totalIncome += Math.abs(val);
+        } else if (type === 'egreso' || (val > 0 && !type)) {
+          totalExpense += Math.abs(val);
+        }
       }
-    } catch {
-      timestamp = getArgentinaDate().toISOString();
-    }
-  } else {
-    // Sin fecha especificada: usar fecha actual de Argentina
-    timestamp = getArgentinaDate().toISOString();
-  }
-
-  const record = {
-    when: timestamp,
-    amount: Math.abs(amount),
-    currency,
-    description: description || '',
-    category: categorized.category,
-    account: account,
-    transactionType: 'egreso' as const,
-    paymentMethod: (paymentMethod || 'efectivo') as any,
-    ai: {
-      predicted: categorized.category,
-      confidence: categorized.confidence,
-      reviewRequired: categorized.confidence < 0.8,
-      generated: true,
-      intent: 'add_expense',
-      merchant: merchant || categorized.merchant_clean || '',
-      dedupHash: categorized.dedupHash
-    },
-    confirmed: false
-  };
-
-  if (persist) {
-    try {
-      await appendJsonl('transactions.jsonl', record);
-    } catch (err) {
-      console.warn('Failed to persist transaction locally:', (err as any)?.message || err);
-    }
-  }
-
-  return { ok: true, record, warning };
-}
-
-export async function actionAddIncome(payload: { amount: number; currency?: string; source?: string; description?: string; when?: string; account?: string; category?: string; token?: string }, persist = true) {
-  const { amount, currency = 'ARS', source, description, when, token } = payload;
-
-  // Resolve account based on currency and keywords (same logic as expenses)
-  let account = payload.account || '';
-
-  // If we have a token, prefer exact system cash account names from backend
-  let systemNames: { arsName: string; usdName: string } | null = null;
-  if (token) {
-    const accounts = await getAccounts(token);
-    systemNames = resolveSystemCashNames(accounts);
-  }
-
-  // Normalize account name to lowercase for comparison
-  const accountLower = (account || '').toLowerCase().trim();
-
-  // Smart account resolution based on keywords first (overrides default currency if needed)
-  if (accountLower.includes('dolar') || accountLower.includes('usd') || accountLower.includes('verde')) {
-    account = systemNames?.usdName || 'Efectivo (USD)';
-    // Implicitly correct currency if needed, though strictly we stick to payload currency unless we want to auto-fix it too
-  } else if (accountLower.includes('peso') || accountLower.includes('ars')) {
-    account = systemNames?.arsName || 'Efectivo (ARS)';
-  } else if (currency === 'USD') {
-    // If currency is USD and account is generic or empty, default to Efectivo USD
-    if (accountLower === 'efectivo' || !accountLower) {
-      account = systemNames?.usdName || 'Efectivo (USD)';
-    }
-  } else {
-    // Default ARS/Generic
-    if (accountLower === 'efectivo' || !accountLower) {
-      account = systemNames?.arsName || 'Efectivo (ARS)';
-    }
-  }
-
-  // Check for archived account
-  let warning = '';
-  if (token) {
-    const accounts = await getAccounts(token);
-
-    // VALIDATION: Check if the account exists (if it's not a default "Efectivo" account)
-    const isDefaultAccount = account.toLowerCase().includes('efectivo');
-    const matched = accounts.find((a: any) => a.name.toLowerCase() === account.toLowerCase());
-
-    if (!matched && !isDefaultAccount && account) {
-      // Account doesn't exist - return selection options
-      const availableAccounts = accounts
-        .filter((a: any) => !a.archived)
-        .map((a: any) => ({
-          name: a.name,
-          type: a.type,
-          currency: a.currency,
-          balance: a.balance || 0
-        }));
-
-      return {
-        ok: false,
-        requiresAccountSelection: true,
-        requestedAccount: account,
-        availableAccounts,
-        pendingTransaction: {
-          amount,
-          currency,
-          source,
-          description,
-          when,
-          category: payload.category
-        },
-        message: `No encontré una cuenta llamada "${account}". ¿En cuál de estas cuentas querés registrar este ingreso?`
-      };
     }
 
-    if (matched && matched.archived) {
-      warning = `⚠️ *Atención*: La cuenta **${account}** está archivada.`;
-    }
+    return {
+      ok: true,
+      totals: { income: totalIncome, expense: totalExpense, net: totalIncome - totalExpense }, // Net logic: Income - Expense? Or Income + Expense (if expense neg)? Usually Income - Expense.
+      count: transactions.length,
+      filtro: { categoria: category, merchant, year, month }
+    };
+
+  } catch (error: any) {
+    console.error('[querySummary] Error:', error.message);
+    return { ok: false, error: error.message };
   }
-
-
-  // Si se proporciona 'when', parsear esa fecha; si no, usar fecha actual de Argentina
-  let timestamp: string;
-  if (when) {
-    try {
-      const whenDate = new Date(when);
-      if (!isNaN(whenDate.getTime())) {
-        timestamp = whenDate.toISOString();
-      } else {
-        timestamp = getArgentinaDate().toISOString();
-      }
-    } catch {
-      timestamp = getArgentinaDate().toISOString();
-    }
-  } else {
-    timestamp = getArgentinaDate().toISOString();
-  }
-
-  const record = {
-    when: timestamp,
-    amount: Math.abs(amount),
-    currency,
-    description: description || source || 'Ingreso',
-    category: payload.category || 'Ingreso',
-    account: account,
-    transactionType: 'ingreso' as const,
-    paymentMethod: 'transferencia' as const,
-    ai: {
-      predicted: payload.category || 'Ingreso',
-      confidence: 1.0,
-      reviewRequired: false,
-      generated: true,
-      intent: 'add_income',
-      merchant: source || '',
-      dedupHash: `income_${timestamp}_${amount}_${currency}`
-    },
-    confirmed: false
-  };
-
-
-  if (persist) {
-    try {
-      await appendJsonl('transactions.jsonl', record);
-    } catch (err) {
-      console.warn('Failed to persist income transaction locally:', (err as any)?.message || err);
-    }
-  }
-
-  return { ok: true, record, warning };
-}
-
-
-export async function actionQuerySummary(payload: { items?: any[]; classifyMissing?: boolean; currency?: string; periodLabel?: string; category?: string; merchant?: string; year?: number; month?: number }) {
-  // Leer historial de transacciones
-  const fs = require('fs');
-  const path = require('path');
-  const filePath = path.join(process.cwd(), 'data', 'transactions.jsonl');
-  let lines: any[] = [];
-  try {
-    const raw = fs.readFileSync(filePath, 'utf8');
-    lines = raw.split('\n').filter(Boolean).map((l: string) => {
-      try { return JSON.parse(l); } catch { return null; }
-    }).filter(Boolean);
-  } catch { }
-
-  // Filtrar por entidades
-  let filtered: any[] = lines;
-  if (payload.category) {
-    const catNorm = (payload.category || '').toLowerCase().replace(/\s+/g, '');
-    filtered = filtered.filter((it: any) => (it.category || '').toLowerCase().replace(/\s+/g, '').includes(catNorm));
-  }
-  if (payload.merchant) {
-    console.log('[Filtro merchant] valor recibido:', payload.merchant);
-    const merchNorm = normalize(payload.merchant || '');
-    console.error('[Filtro merchant] buscando:', merchNorm);
-    filtered = filtered.filter((it: any) => {
-      const normHist = normalize(it.merchant || '');
-      const match = normHist.includes(merchNorm);
-      if (match) console.error('[Filtro merchant] match:', normHist, '<->', merchNorm);
-      return match;
-    });
-  }
-  if (payload.year) {
-    const yearStr = payload.year.toString();
-    filtered = filtered.filter((it: any) => {
-      const d = it.when || it.date || it.ts;
-      return d && d.startsWith(yearStr);
-    });
-  }
-  if (payload.month) {
-    const monthNum = payload.month;
-    filtered = filtered.filter((it: any) => {
-      const d = it.when || it.date || it.ts;
-      const m = d ? Number(d.split('-')[1]) : null;
-      return m === monthNum;
-    });
-  }
-
-  let totalIncome = 0, totalExpense = 0;
-  // Si la categoría es transferencia, sumar todos los montos filtrados por merchant y categoría
-  if (payload.category && normalize(payload.category) === 'transferencia') {
-    totalExpense = filtered
-      .filter(it => normalize(it.category || '') === normalize('transferencia'))
-      .reduce((acc, it) => acc + (Number(it.amount) || 0), 0);
-  } else {
-    for (const it of filtered) {
-      // Excluir transferencias internas
-      if (it.isInternalTransfer === true || it.transactionType === 'transferencia') continue;
-
-      const isIncome = it.transactionType === 'ingreso' || (it.amount < 0 && !it.transactionType);
-      const isExpense = it.transactionType === 'egreso' || (it.amount > 0 && !it.transactionType);
-
-      if (isIncome) totalIncome += Math.abs(it.amount);
-      else if (isExpense) totalExpense += Math.abs(it.amount);
-    }
-  }
-  return {
-    ok: true,
-    totals: { income: totalIncome, expense: totalExpense, net: totalIncome + totalExpense },
-    count: filtered.length,
-    filtro: { categoria: payload.category, merchant: payload.merchant, year: payload.year, month: payload.month }
-  };
 }

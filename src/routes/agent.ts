@@ -31,10 +31,7 @@ r.post('/chat', async (req, res) => {
 
 r.post('/forecast', async (req, res) => {
   try {
-    const { category, horizonDays } = req.body;
-
-    // NEW LOGIC: Default to Intra-Month projection if no horizon or small horizon
-    // Or explicit param? Let's assume default is now this robust view.
+    const { category, horizonDays, transactions } = req.body;
 
     const now = new Date();
     const currentMonth = now.getMonth();
@@ -42,31 +39,64 @@ r.post('/forecast', async (req, res) => {
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     const daysElapsed = now.getDate();
 
-    // Mock Real Data for Current Month (Day 1 to Today)
-    const currentMonthData: { date: Date, value: number }[] = [];
-    let accum = 0;
-    for (let i = 1; i <= daysElapsed; i++) {
-      // Random daily expense with some "salary spike" or irregular pattern
-      let daily = Math.random() * 5000 + 1000;
-      if (i === 5 || i === 20) daily += 10000; // Big expenses
-      accum += daily;
-      currentMonthData.push({
-        date: new Date(currentYear, currentMonth, i),
-        value: daily
+    // 1. Parse Real Data from Backend
+    const validTransactions: { date: Date, value: number }[] = [];
+
+    if (Array.isArray(transactions)) {
+      console.log(`[AI-Service] Incoming transactions count: ${transactions.length}`);
+      transactions.forEach((t, i) => {
+        if (t.when && t.amount !== undefined) {
+          const d = new Date(t.when);
+          if (!isNaN(d.getTime())) {
+            validTransactions.push({
+              date: d,
+              value: Number(t.amount)
+            });
+          }
+        }
       });
     }
 
-    // Usar el nuevo servicio de proyección intra-mensual
-    // Pasamos historia vacía [] para que confíe en los datos actuales
-    const result = ForecastingService.predictAdaptive([], currentMonthData, daysInMonth, daysElapsed);
+    console.log(`[AI-Service] Parsed ${validTransactions.length} valid transactions.`);
 
-    // Map to API response structure
-    // historySmoothed -> Real Cumulative
-    // forecast -> Prediction (which is also cumulative)
+    // 2. Split into Historical vs Current Month
+    // USE UTC consistently to avoid timezone shifts
+    const targetMonth = now.getUTCMonth();
+    const targetYear = now.getUTCFullYear();
+    console.log(`[AI-Service] Target Month: ${targetMonth} (0-indexed), Target Year: ${targetYear}`);
+
+    const historicalData: { date: Date, value: number }[] = [];
+    const currentMonthData: { date: Date, value: number }[] = [];
+
+    validTransactions.forEach((p, i) => {
+      const pMonth = p.date.getUTCMonth();
+      const pYear = p.date.getUTCFullYear();
+
+      if (pMonth === targetMonth && pYear === targetYear) {
+        currentMonthData.push(p);
+      } else {
+        historicalData.push(p);
+      }
+    });
+
+    console.log(`[AI-Service] Split: Historical=${historicalData.length}, CurrentMonth=${currentMonthData.length}`);
+    const currentSum = currentMonthData.reduce((s, t) => s + t.value, 0);
+    console.log(`[AI-Service] Current Month Accumulated: ${currentSum}`);
+    if (currentMonthData.length > 0) {
+      console.log(`[AI-Service] First Current Month Data: ${JSON.stringify(currentMonthData[0])}`);
+    }
+
+    // 3. Generate Forecast with Real Data
+    const result = ForecastingService.predictAdaptive(
+      historicalData,
+      currentMonthData,
+      daysInMonth,
+      daysElapsed
+    );
 
     res.json({
       ok: true,
-      historySmoothed: currentMonthData, // Using the real data we generated
+      historySmoothed: validTransactions, // Return full history for graphing
       forecast: result
     });
 
