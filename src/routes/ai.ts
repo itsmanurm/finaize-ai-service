@@ -112,8 +112,8 @@ r.post('/summarize', async (req, res) => {
   const byMerchant = new Map<string, number>();
 
   for (const it of enriched) {
-    // Excluir transferencias internas
-    if ((it as any).isInternalTransfer === true || (it as any).transactionType === 'transferencia') continue;
+    // Excluir transferencias internas y ajustes
+    if ((it as any).isInternalTransfer === true || (it as any).transactionType === 'transferencia' || (it as any).isAdjustment === true) continue;
 
     const isIncome = (it as any).transactionType === 'ingreso' || (!(it as any).transactionType && it.amount >= 0);
 
@@ -218,7 +218,7 @@ r.post('/analyze-profile', async (req, res) => {
     console.log(`[AI Analyze Profile] Analizando ${transactions.length} transacciones, ${timeframeMonths || 6} meses`);
 
     const profile = analyzeFinancialProfile({
-      transactions,
+      transactions: transactions.filter((t: any) => t.isAdjustment !== true),
       budgets: budgets || [],
       goals: goals || [],
       timeframeMonths: timeframeMonths || 6
@@ -290,6 +290,7 @@ r.post('/forecast', async (req, res) => {
     const currentPointsMap = new Map<string, number>();
 
     for (const t of filtered) {
+      if ((t as any).isAdjustment === true) continue;
       const d = (t as any).date || t.when;
       if (!d) continue;
 
@@ -378,7 +379,7 @@ r.post('/anomalies', async (req, res) => {
   const { transactions, threshold, userId } = result.data;
 
   try {
-    const anomalies = AnomalyService.detectOutliers(transactions, threshold);
+    const anomalies = AnomalyService.detectOutliers(transactions.filter((t: any) => t.isAdjustment !== true), threshold);
 
     // Send notifications to backend for high severity anomalies
     if (userId && anomalies.length > 0) {

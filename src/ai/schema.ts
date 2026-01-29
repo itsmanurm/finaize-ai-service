@@ -68,7 +68,8 @@ export const TransactionSchema = z.object({
     dedupHash: z.string().optional()
   }).optional(),
   confirmed: z.boolean().optional(),
-  isInternalTransfer: z.boolean().optional()
+  isInternalTransfer: z.boolean().optional(),
+  isAdjustment: z.boolean().optional()
 });
 export type TransactionInput = z.infer<typeof TransactionSchema>;
 
