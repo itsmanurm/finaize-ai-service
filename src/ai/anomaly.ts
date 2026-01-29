@@ -1,5 +1,6 @@
 import * as ss from 'simple-statistics';
 import type { TransactionInput } from './schema';
+import { formatCurrency } from '../utils/format';
 
 export interface AnomalyResult {
     transactionId?: string; // ID si existe, o índice
@@ -49,11 +50,11 @@ export class AnomalyService {
                     const ratio = Math.round((val / median) * 100);
                     let reason = '';
                     if (score > 8) {
-                        reason = `¡Cuidado! Este gasto es completamente atípico: gastaste $${val.toLocaleString('es-AR')} en ${cat}, más de 3 veces lo que gastan normalmente ($${Math.round(median).toLocaleString('es-AR')}). Verificá si es correcto.`;
+                        reason = `¡Cuidado! Este gasto es completamente atípico: gastaste ${formatCurrency(val)} en ${cat}, más de 3 veces lo que gastan normalmente (${formatCurrency(median)}). Verificá si es correcto.`;
                     } else if (score > 5) {
-                        reason = `Detectamos un gasto importante: $${val.toLocaleString('es-AR')} en ${cat}. Es bastante más que lo habitual ($${Math.round(median).toLocaleString('es-AR')}). ¿Fue intencional?`;
+                        reason = `Detectamos un gasto importante: ${formatCurrency(val)} en ${cat}. Es bastante más que lo habitual (${formatCurrency(median)}). ¿Fue intencional?`;
                     } else {
-                        reason = `Notamos un gasto un poco elevado: $${val.toLocaleString('es-AR')} en ${cat}, por encima de tu promedio ($${Math.round(median).toLocaleString('es-AR')}). Solo para que lo tengas en cuenta.`;
+                        reason = `Notamos un gasto un poco elevado: ${formatCurrency(val)} en ${cat}, por encima de tu promedio (${formatCurrency(median)}). Solo para que lo tengas en cuenta.`;
                     }
                     anomalies.push({
                         transactionId: t._id || t.id,

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { ensureSession, appendMessage, storePendingTransaction, getPendingTransaction, clearPendingTransaction } from '../ai/session';
 import { parseMessage } from '../ai/nlu';
 import { actionAddExpense, actionQuerySummary, actionQueryDollar, actionAddIncome } from '../ai/actions';
+import { formatCurrency } from '../utils/format';
 
 
 const r = Router();
@@ -144,7 +145,8 @@ r.post('/chat', async (req, res) => {
         // Build reply with numbered account options
         reply = actionResult.message + '\n\n';
         actionResult.availableAccounts.forEach((acc: any, idx: number) => {
-          const balanceInfo = acc.balance !== undefined ? ` - Saldo: ${acc.currency} ${acc.balance.toLocaleString('es-AR')}` : '';
+          const balanceInfo = acc.balance !== undefined ? ` - Saldo: ${formatCurrency(acc.balance, acc.currency)}` : '';
+
           reply += `${idx + 1}. **${acc.name}** (${acc.type}, ${acc.currency})${balanceInfo}\n`;
         });
         reply += '\n_Respondé con el número de la cuenta que querés usar._';
@@ -156,12 +158,12 @@ r.post('/chat', async (req, res) => {
 
       // Respuesta adaptada según intent
       if (nlu.intent === 'add_expense') {
-        reply = `Gasto registrado: ${actionResult.record.category} ${actionResult.record.amount} ${actionResult.record.currency}`;
+        reply = `Gasto registrado: ${actionResult.record.category} ${formatCurrency(actionResult.record.amount, actionResult.record.currency)}`;
         if (actionResult.warning) {
           reply += `\n\n${actionResult.warning}`;
         }
       } else if (nlu.intent === 'add_income') {
-        reply = `✅ Ingreso registrado: ${actionResult.record.currency} ${Math.abs(actionResult.record.amount)}`;
+        reply = `✅ Ingreso registrado: ${formatCurrency(actionResult.record.amount, actionResult.record.currency)}`;
         if (actionResult.warning) {
           reply += `\n\n${actionResult.warning}`;
         }
@@ -170,7 +172,7 @@ r.post('/chat', async (req, res) => {
         reply = `Resumen: ingreso ${actionResult.totals.income}, gasto ${actionResult.totals.expense}, neto ${actionResult.totals.net}`;
       } else if (nlu.intent === 'query_top_expenses') {
         if (actionResult.topExpenses && actionResult.topExpenses.length) {
-          reply = 'Tus gastos más altos este mes fueron: ' + actionResult.topExpenses.map((e: any) => `${e.description} (${e.amount} ${e.currency})`).join(', ');
+          reply = 'Tus gastos más altos este mes fueron: ' + actionResult.topExpenses.map((e: any) => `${e.description} (${formatCurrency(e.amount, e.currency)})`).join(', ');
         } else {
           reply = 'No se encontraron gastos altos este mes.';
         }
@@ -187,7 +189,7 @@ r.post('/chat', async (req, res) => {
       } else if (nlu.intent === 'query_dollar_rate') {
         if (actionResult.ok && actionResult.rates?.length) {
           const ratesText = actionResult.rates.map((r: any) =>
-            `${r.nombre}: Compra $${r.compra?.toLocaleString('es-AR') || 'N/A'}, Venta $${r.venta?.toLocaleString('es-AR') || 'N/A'}`
+            `${r.nombre}: Compra $${r.compra?.toLocaleString('es-AR')}, Venta $${r.venta?.toLocaleString('es-AR')}`
           ).join(' | ');
           reply = `💵 Cotizaciones del dólar:\n${ratesText}`;
         } else {

@@ -1,5 +1,6 @@
 // Utils for sending notifications to the backend
 import { config } from '../config';
+import { formatCurrency } from './format';
 
 interface NotificationPayload {
   userId: string;
@@ -80,7 +81,7 @@ export async function notifyRecurringSubscription(
   frequency: number
 ): Promise<boolean> {
   const frequencyText = frequency >= 10 ? 'muy frecuentes' : frequency >= 5 ? 'frecuentes' : 'recurrentes';
-  const message = `Detectamos pagos ${frequencyText} de ~$${Math.round(avgAmount).toLocaleString('es-AR')} a "${merchant}". ¿Es una suscripción?`;
+  const message = `Detectamos pagos ${frequencyText} de ~${formatCurrency(avgAmount)} a "${merchant}". ¿Es una suscripción?`;
 
   return sendNotificationToBackend({
     userId,
