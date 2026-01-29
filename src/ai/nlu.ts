@@ -105,9 +105,20 @@ const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
   { name: 'create_goal', re: /\b(quiero juntar|quiero ahorrar|mi meta es|objetivo de)\b/i },
   { name: 'add_contribution', re: /\b(ahorré|ahorre|ahorró|guardé|guarde|guardó|aparté|aparte|apartó|separé|separe|separó|puse aparte|puse|agregué|agregue|agregó|deposité|deposite|depositó|destiné|destine|destinó)\b.*\b(meta|ahorro|objetivo)\b/i },
 
+  // Consultar Metas
+  { name: 'check_goals', re: /\b(cómo (voy|van|vienen) mis metas|cómo voy con el ahorro|cuánto (llevo|tengo) ahorrado|estado de mis objetivos|mis metas)\b/i },
+
   // Categorización
   { name: 'categorize', re: /\b(categoría|¿en qué categor|en qué entra|¿a qué categor)\b/i },
   { name: 'categorize', re: /\b(categorizar|clasificar)\b/i },
+
+  // Suscripciones y duplicados
+  { name: 'check_subscriptions', re: /\b(suscripciones?|duplicadas?|pagos recurrentes?|doble cobro|netflix|spotify|disney|hbo|prime)\b/i },
+  { name: 'check_subscriptions', re: /\b(estoy pagando dos veces|tengo repetid|servicio duplicado)\b/i },
+
+  // Ayuda y Capacidades
+  { name: 'help', re: /\b(ayuda|qué podés hacer|qué sabes hacer|sos|eres|hola|buen día)\b/i },
+  { name: 'help', re: /\b(para qué servís|funciones|explicame qué hacés)\b/i },
 
   // Educación financiera
   { name: 'general_knowledge', re: /\b(cómo|cómo hago|cómo puedo|qué es|enseña|explica|tips?|consejos?|aprende?|estrategia)\b.*\b(ahorr|presupuest|deud|finanz|dinero|gasto)\b/i },
@@ -230,9 +241,18 @@ export async function parseMessage(message: string): Promise<NLUResult> {
     entities.installments = parseInt(installmentsMatch[1], 10);
   }
 
-  // Moneda
+  // Moneda y Método de Pago
   const currencyMatch = message.match(/\b(ARS|USD|EUR|pesos?|d[oó]lares?|euros?|pesitos)\b/i);
   if (currencyMatch) entities.currency = currencyMatch[1].toUpperCase();
+
+  const payMethodMatch = message.match(/\b(credito|crédito|debito|débito|efectivo|transferencia|tarjeta)\b/i);
+  if (payMethodMatch) {
+    const pm = payMethodMatch[1].toLowerCase();
+    if (pm.includes('credito') || pm.includes('crédito')) entities.paymentMethod = 'credito';
+    else if (pm.includes('debito') || pm.includes('débito')) entities.paymentMethod = 'debito';
+    else if (pm === 'tarjeta') entities.paymentMethod = 'credito'; // default assumption or leave ambiguous? Let's assume generic means looking for card usage.
+    else entities.paymentMethod = pm;
+  }
 
   // Item para purchase_advice (heurística simple: lo que sigue a "comprar" o "comprarme")
   const itemMatch = message.match(/(?:comprar|comprarme)\s+(?:una?|el|la)?\s*([A-Za-záéíóúüñ\s]+?)(?:\s+de|\s+en|\s+por|\s+con|\s+\?|\s*\.|$)/i);
@@ -600,6 +620,8 @@ REGLAS ADICIONALES:
 - Si el usuario pregunta por resumen, balance, gastos con comparación entre períodos (ej: "en comparación al año pasado", "comparar con el mes anterior", "vs el anterior"), responde con intent "query_comparison" y extrae month, year, compare_month, compare_year. IMPORTANTE: Si dice "mes anterior" o "el anterior", calcular correctamente el mes inmediatamente previo (ver reglas de REFERENCIAS TEMPORALES arriba). Si pregunta por categoría específica (ej: "en comida"), extraer category también.
 - Si el usuario pregunta por resumen, balance, gastos altos, recurrentes SIN comparación, responde con intent "query_summary" o "query_top_expenses" según corresponda.
 - Si el usuario pregunta por categorización, responde con intent "categorize".
+- Si el usuario pregunta por "suscripciones", "duplicados", "pagos recurrentes" o menciona servicios como Netflix/Spotify sin monto (consulta), responde con intent "check_subscriptions".
+- Si el usuario saluda o pide ayuda ("hola", "ayuda", "qué podés hacer"), responde con intent "help".
 
 EJEMPLOS:
 - "¿Puedo comprarme una heladera de 800000 en 12 cuotas?" → {"intent": "purchase_advice", "confidence": 0.99, "entities": {"item": "heladera", "amount": 800000, "installments": 12, "currency": "ARS"}}

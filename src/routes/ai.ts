@@ -1,6 +1,8 @@
+
 import { Router } from 'express';
 import { ItemSchema, FeedbackSchema, SummarizeSchema, ForecastRequestSchema, AnomalyRequestSchema } from '../ai/schema';
 import { categorize } from '../ai/service';
+import { SUSCRIPCIONES } from '../utils/ai-constants';
 import { appendJsonl } from '../utils/jsonl';
 import { parseMessage } from '../ai/nlu';
 import { analyzeFinancialProfile } from '../ai/profile-analyzer';
@@ -22,7 +24,7 @@ r.post('/parse', async (req, res) => {
     const result = await parseMessage(message);
 
     // Log resultado
-    console.log(`[AI Parse] Result - Intent: ${result.intent}, Confidence: ${result.confidence}`);
+    console.log(`[AI Parse]Result - Intent: ${result.intent}, Confidence: ${result.confidence} `);
 
     return res.json({ ok: true, ...result });
   } catch (error: any) {
@@ -149,7 +151,16 @@ r.post('/summarize', async (req, res) => {
     tips.push('Tu gasto en Transporte es alto este período ( >30% de los egresos ). Considerá optimizar traslados.');
   }
 
-  const subCandidates = merchArr.filter(m => /netflix|spotify|disney|youtube/i.test(m.merchant ?? ''));
+  /* 
+   * SUGGESTION LOGIC
+   * Updated to use strict Subscription Whitelist from shared constants
+   */
+  const subCandidates = merchArr.filter(m => {
+    // Check coverage against full whitelist
+    const txt = m.merchant?.toLowerCase() || '';
+    return SUSCRIPCIONES.some(s => txt.includes(s.toLowerCase()));
+  });
+
   if (subCandidates.length >= 2) tips.push('Detectamos múltiples suscripciones. Revisá si las usás todas.');
   if (net < 0) tips.push('Cerraste el período con balance negativo. Evaluá reducir rubros con mayor peso.');
 
@@ -169,7 +180,7 @@ r.post('/summarize', async (req, res) => {
 });
 
 /** POST /api/ai -> Redirige a /ai/categorize */
-// Nota: el router se monta en `/ai`, por lo que aquí la ruta raíz `/` redirige a `/categorize`.
+// Nota: el router se monta en `/ ai`, por lo que aquí la ruta raíz ` / ` redirige a ` / categorize`.
 r.post('/', (req, res) => {
   res.redirect(307, '/categorize');
 });
@@ -271,9 +282,9 @@ r.post('/forecast', async (req, res) => {
     // Obtener string "YYYY-MM" local usando la fecha actual del sistema
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1; // 1-12
-    const currentMonthPrefix = `${currentYear}-${currentMonth.toString().padStart(2, '0')}`;
+    const currentMonthPrefix = `${currentYear} -${currentMonth.toString().padStart(2, '0')} `;
 
-    console.log(`[AI-Service] Current Month Target: ${currentMonthPrefix}`);
+    console.log(`[AI - Service] Current Month Target: ${currentMonthPrefix} `);
 
     const historicalPointsMap = new Map<string, number>();
     const currentPointsMap = new Map<string, number>();

@@ -5,6 +5,7 @@ import { getCachedCategorization, setCachedCategorization } from './cache';
 import { categorizeWithOpenAI } from './openai-service';
 import { consultMemory } from './learning-service';
 import { config } from '../config';
+import { SUSCRIPCIONES } from '../utils/ai-constants';
 
 type Currency = 'ARS' | 'USD';
 
@@ -76,8 +77,7 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
     return cached;
   }
 
-  // Verificar aprendizaje del usuario (Feedback Loop)
-  // Esto tiene precedencia sobre Regex y OpenAI porque es lo que el usuario quiere explícitamente
+  // LAYER 1: Memory (User Feedback) - Existing
   const userLearned = await consultMemory({
     merchant: input.merchant,
     description: input.description
@@ -89,10 +89,9 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
       confidence: userLearned.confidence,
       reasons: [`learned:${userLearned.source} (${userLearned.count} votes)`],
       merchant_clean: normalizeMerchant(input.merchant || ''),
-      dedupHash: '', // Se generará abajo si se necesita
-      aiEnhanced: false // No es IA generativa, es memoria
+      dedupHash: '',
+      aiEnhanced: false
     };
-    // Calcular hash para consistencia
     const merchant_clean = normalizeMerchant(input.merchant || '');
     result.dedupHash = dedupHash({
       amount: input.amount,
@@ -101,15 +100,95 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
       accountLast4: input.accountLast4,
       bankMessageId: input.bankMessageId
     });
-
-    // Guardar en cache para futuro inmediato
     await setCachedCategorization(cacheKey, result);
     return result;
   }
 
-
-
+  // Common normalization
   const merchant_clean = normalizeMerchant(input.merchant || '');
+
+  // LAYER 2: Strict Subscriptions (New)
+  const fullText = (merchant_clean + ' ' + input.description).toLowerCase();
+  // Import dynamically to avoid top-level optional import issues if file was just created, though standard import is better. 
+  // We will add import at top, but for now assuming it's available or we add it.
+  const isSubscription = SUSCRIPCIONES.some(sub => fullText.includes(sub.toLowerCase()));
+
+  if (isSubscription) {
+    const result: CategorizeOutput = {
+      category: 'Suscripciones',
+      confidence: 0.95,
+      reasons: ['whitelist:subscription'],
+      merchant_clean,
+      dedupHash: dedupHash({ amount: input.amount, when: input.when, merchant_clean, accountLast4: input.accountLast4, bankMessageId: input.bankMessageId }),
+      aiEnhanced: false
+    };
+    await setCachedCategorization(cacheKey, result);
+    return result;
+  }
+
+  // LAYER 3: Recurring Patterns (Contextual Intelligence) (New)
+  // If we have history, check if this EXACT merchant + amount combo appeared before.
+  if (input.previousTransactions && input.previousTransactions.length > 0) {
+    // Look for exact match on merchant and amount (margin of error small for currency fluctuation? No, strict for now)
+    const match = input.previousTransactions.find(t =>
+      t.amount === input.amount &&
+      t.category &&
+      t.category !== 'Sin clasificar' &&
+      normalizeMerchant(t.description || '').includes(merchant_clean) // Fuzzy matching merchant against historical description
+    );
+
+    if (match && match.category) {
+      const result: CategorizeOutput = {
+        category: match.category,
+        confidence: 0.85,
+        reasons: ['pattern:recurring_amount'],
+        merchant_clean,
+        dedupHash: dedupHash({ amount: input.amount, when: input.when, merchant_clean, accountLast4: input.accountLast4, bankMessageId: input.bankMessageId }),
+        aiEnhanced: false
+      };
+      await setCachedCategorization(cacheKey, result);
+      return result;
+    }
+  }
+
+  // LAYER 4: Smart Heuristics (Keyword Intelligence) (New)
+  const lowerDesc = input.description.toLowerCase();
+
+  // 4.1 Loans / Installments
+  if (lowerDesc.includes('cuota') || lowerDesc.match(/\d{1,2}\/\d{1,2}/)) {
+    // "Cuota 3/12" or just "Cuota" often implies Debt/Loan or Credit Card Payment (if large)
+    // But simple heuristics: Préstamos if it looks like a loan, or generic expense.
+    // Let's go with 'Préstamos' if explicit.
+    if (lowerDesc.includes('prestamo') || lowerDesc.includes('préstamo')) {
+      const result: CategorizeOutput = {
+        category: 'Préstamos',
+        confidence: 0.9,
+        reasons: ['heuristic:keyword_loan'],
+        merchant_clean,
+        dedupHash: dedupHash({ amount: input.amount, when: input.when, merchant_clean, accountLast4: input.accountLast4, bankMessageId: input.bankMessageId }),
+        aiEnhanced: false
+      };
+      await setCachedCategorization(cacheKey, result);
+      return result;
+    }
+  }
+
+  // 4.2 Transfers
+  if (input.transactionType === 'transferencia' || lowerDesc.includes('transferencia') || lowerDesc.includes('transf')) {
+    // If positive -> Ingresos (usually). If negative -> Transferencias.
+    const isIncome = input.amount > 0;
+    const result: CategorizeOutput = {
+      category: isIncome ? 'Ingresos' : 'Transferencias',
+      confidence: 0.8,
+      reasons: ['heuristic:keyword_transfer'],
+      merchant_clean,
+      dedupHash: dedupHash({ amount: input.amount, when: input.when, merchant_clean, accountLast4: input.accountLast4, bankMessageId: input.bankMessageId }),
+      aiEnhanced: false
+    };
+    await setCachedCategorization(cacheKey, result);
+    return result;
+  }
+
   const bag = [merchant_clean, input.description].filter(Boolean).join(' ').trim();
 
   const common = {
@@ -123,7 +202,7 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
     })
   };
 
-  // Si se requiere IA específicamente o si no hay match de reglas
+  // LAYER 5: Rules (Existing Regex)
   const rule = rulesCategory(bag);
   // Validar configuración de AI_MIN_CONFIDENCE
   const minConf = config.AI_MIN_CONFIDENCE;
@@ -131,10 +210,8 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
     console.warn('AI_MIN_CONFIDENCE no está configurado correctamente. Usando valor por defecto: 0.6');
   }
 
-  // Intentar OpenAI si:
-  // 1. useAI es true
-  // 2. No hay match de reglas regex
-  // 3. La confianza de reglas es baja
+  // LAYER 6: AI (OpenAI) - Generative Fallback
+  // Intentar OpenAI si useAI es true O no hay rule hit O rule strength es bajo
   if (input.useAI || !rule.hit || (rule as any).strength < minConf) {
     try {
       // Verificar si OpenAI está disponible
@@ -142,7 +219,6 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
         const key = common.dedupHash;
 
         if (inFlightRequests.has(key)) {
-          // Reutilizar la petición en curso
           return await inFlightRequests.get(key)!;
         }
 
@@ -169,12 +245,7 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
               aiReasoning: openAIResult.reasoning
             };
 
-            // Guardar en cache
-            try {
-              await setCachedCategorization(cacheKey, res);
-            } catch (cacheErr) {
-              console.warn('Failed to set cache for categorization:', cacheErr);
-            }
+            await setCachedCategorization(cacheKey, res);
 
             return res;
           } catch (err: any) {
@@ -193,17 +264,15 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
         try {
           return await p;
         } catch (err) {
-          // Si falla, continuar con reglas como fallback
           console.warn('OpenAI categorization failed, falling back to rules:', (err as any)?.message || err);
         }
       }
     } catch (error) {
       console.warn('OpenAI categorization failed, falling back to rules:', (error as any)?.message || error);
-      // Continuar con reglas como fallback
     }
   }
 
-  // Aplicar reglas regex
+  // Fallback to Rule Result (even if weak) or Default
   let result: CategorizeOutput;
 
   if ((rule as any).hit) {
@@ -212,9 +281,7 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
     if (conf >= minConf) {
       category = (rule as any).category;
     } else {
-      // Si la regla tuvo hit pero la confianza es baja, usar fallback basado en el tipo
       const isExpense = input.transactionType === 'egreso' || (Number(input.amount) < 0 && !input.transactionType);
-      // Nota: Si no hay transactionType, asumimos egreso por defecto para montos positivos (comportamiento estándar)
       category = isExpense ? 'Sin clasificar' : 'Ingresos';
     }
     result = {
@@ -227,11 +294,6 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
     };
   } else {
     const isExpense = input.transactionType === 'egreso' || (Number(input.amount) < 0 && !input.transactionType);
-
-    console.log('DEBUG: Categorize Input:', JSON.stringify(input, null, 2));
-    console.log('DEBUG: Rule Match:', JSON.stringify(rule, null, 2));
-    console.log('DEBUG: AI Confidence Threshold:', minConf);
-    // Fallback inteligente
     const fallbackCategory = isExpense ? 'Sin clasificar' : 'Ingresos';
     result = {
       category: fallbackCategory,

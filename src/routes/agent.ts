@@ -22,7 +22,7 @@ r.post('/chat', async (req, res) => {
 
   try {
     const message = await agentChatCompletion(parse.data);
-    return res.json({ ok: true, message });
+    return res.json({ ok: true, reply: message });
   } catch (error: any) {
     console.error('[Agent Chat] Error:', error);
     return res.status(500).json({ ok: false, error: error.message });
