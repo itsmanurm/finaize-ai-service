@@ -182,7 +182,7 @@ r.post('/summarize', async (req, res) => {
 /** POST /api/ai -> Redirige a /ai/categorize */
 // Nota: el router se monta en `/ ai`, por lo que aquí la ruta raíz ` / ` redirige a ` / categorize`.
 r.post('/', (req, res) => {
-  res.redirect(307, '/categorize');
+  res.redirect(307, '/ai/categorize');
 });
 
 // Ruta para pruebas adicionales
