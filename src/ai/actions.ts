@@ -1,6 +1,7 @@
 const buildBearer = (token: string) => token.startsWith('Bearer ') ? token : `Bearer ${token}`;
 
 // Acción real: consulta de mercado/inversión usando Backend
+/*
 export async function queryMarketInfo(payload: { activo?: string; period?: string; tipo?: string }) {
   const backendUrl = process.env.FINAIZE_BACKEND_URL || 'http://localhost:3001';
   let tickers: string[] = [];
@@ -48,11 +49,16 @@ export async function queryMarketInfo(payload: { activo?: string; period?: strin
     return { ok: false, error: 'Failed to fetch market data', activos: [] };
   }
 }
+*/
+export async function queryMarketInfo(payload: any) {
+  return { ok: false, error: 'Module disabled' };
+}
 
 /**
  * Acción: Consultar cotizaciones del dólar
  * Llama al backend de Finaize que usa dolarapi.com
  */
+/*
 export async function actionQueryDollar() {
   try {
     // URL del backend - usar variable de entorno o fallback
@@ -83,6 +89,10 @@ export async function actionQueryDollar() {
     console.error('[actionQueryDollar] Error:', error.message);
     return { ok: false, error: error.message, rates: [] };
   }
+}
+*/
+export async function actionQueryDollar() {
+  return { ok: false, error: 'Module disabled' };
 }
 
 // Acción real: registrar ingreso

@@ -64,10 +64,10 @@ function logNLU(level: 'info' | 'warn' | 'error', msg: string, data?: any) {
 // Ordenadas por especificidad (más específicas primero)
 const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
   // Info de mercado (CEDEARs, Cripto, Acciones) - Prioridad alta
-  { name: 'query_market_info', re: /\b(cedear|criptomonedas?|btc|bitcoin|eth|ethereum|acciones|invertir en|mejores inveri|qué activo|qué recomiend|bolsa de valore)\b/i },
+  // { name: 'query_market_info', re: /\b(cedear|criptomonedas?|btc|bitcoin|eth|ethereum|acciones|invertir en|mejores inveri|qué activo|qué recomiend|bolsa de valore)\b/i },
 
   // Cotización dólar
-  { name: 'query_dollar_rate', re: /\b(d[oó]lar|cotizaci[oó]n|precio del d[oó]lar|blue|mep|ccl|contado con liquidaci[oó]n|tipo de cambio|cu[aá]nto est[aá] el d[oó]lar|valor del d[oó]lar|d[oó]lar hoy|d[oó]lar actual)\b/i },
+  // { name: 'query_dollar_rate', re: /\b(d[oó]lar|cotizaci[oó]n|precio del d[oó]lar|blue|mep|ccl|contado con liquidaci[oó]n|tipo de cambio|cu[aá]nto est[aá] el d[oó]lar|valor del d[oó]lar|d[oó]lar hoy|d[oó]lar actual)\b/i },
 
   // Asesoría de compra (Purchase Advice)
   { name: 'purchase_advice', re: /(puedo|conviene|vale la pena|idea|querr[ií]a|gustar[ií]a).*(comprar|comprarme)/i },
