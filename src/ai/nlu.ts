@@ -88,29 +88,37 @@ const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
   { name: 'query_summary', re: /\b(cuánto gasté?|cuánto gasto|resumen|balance|total de gastos|mis gastos|cuál fue|en el (mes|año|trimestre))\b/i },
   { name: 'query_summary', re: /\b(desde que|en los últimos|últimos \d+ (días|meses)).*gast/i },
 
-  // Corrección de transacciones
-  { name: 'correct_transaction', re: /\b(correg[ií]|cambi[aá]|modific[aá]|edit[aá]|actualiz[aá]|arregl[aá])\b.*\b(monto|cantidad|cuenta|categor[ií]a|precio|valor|importe)\b/i },
-  { name: 'correct_transaction', re: /\b(no (era|fueron|fue)|en realidad (era|fueron|fue)|mejor dicho|quise decir|me equivoqu[eé]|le err[eé])\b/i },
-  { name: 'correct_transaction', re: /\b(era|fue|fueron|son)\s+(\d+(?:[.,]\d+)?)/i }, // "era 1200" (sin asterisco necesario si tiene palabra clave)
-  { name: 'correct_transaction', re: /^\s*\*+\d+(?:[.,]\d+)?\s*$/ }, // "*1200" obligatorio asterisco inicio (si es solo numero)
-  { name: 'correct_transaction', re: /^\s*\d+(?:[.,]\d+)?\*+\s*$/ }, // "1200*" obligatorio asterisco fin (si es solo numero)
-  { name: 'correct_transaction', re: /\*\s*(\d+(?:[.,]\d+)?)/ }, // *1200 en texto
-  { name: 'correct_transaction', re: /\b([A-Za-zñÑáéíóúÁÉÍÓÚ]+\*)/ }, // Palabra con asterisco: "Comida*"
+  // Corrección de transacciones - MÁS ESTRICTO
+  // Corrección de transacciones - MÁS ESTRICTO
+  // Evitar conflicto con "agregué" (add_contribution) o "saqué" (withdraw/expense)
+  { name: 'correct_transaction', re: /\b(correg[ií]|modific[aá]|edit[aá]|actualiz[aá]|arregl[aá]|ajust[aá])\b/i },
+  { name: 'correct_transaction', re: /\b(cambi[aá]|pas[aá]|pon[eé]|ponele|defin[ií]|sete[aá])\b.*\b(monto|cantidad|cuenta|categor[ií]a|precio|valor|importe|nombre|t[ií]tulo|descripci[oó]n|moneda|divisa|fecha|plazo|vencimiento|destino|objetivo)\b/i },
+  { name: 'correct_transaction', re: /\b(no (era|fueron|fue|es)|en realidad (era|fueron|fue|es)|mejor dicho|quise decir|me equivoqu[eé]|le err[eé]|error|mala m[ií]a)\b/i },
+  // Correcciones implícitas específicas ("La fecha es...", "En dolares")
+  { name: 'correct_transaction', re: /\b(la fecha|el vencimiento|el plazo)\s+(es|era|ser[ií]a|pon[eé])\s+/i },
+  { name: 'correct_transaction', re: /\b(la moneda|la divisa)\s+(es|era|ser[ií]a|pon[eé])\s+/i },
+  { name: 'correct_transaction', re: /\b(el nombre|el t[ií]tulo)\s+(es|era|ser[ií]a|pon[eé])\s+/i },
+  { name: 'correct_transaction', re: /\b(el monto|el valor|el objetivo)\s+(es|era|ser[ií]a|pon[eé])\s+/i },
 
-  // Gastos/ingresos
-  { name: 'add_expense', re: /\b(gasté|gaste|gastó|pagué|pague|pagó|compré|compre|compró|saqué|saque|sacó|retiré|retire|retiró|extraje|extrajo|me cobraron|me cobró|me descontaron|salió|salio|salieron|gasto|pago|compro|saco|retiro|registrar gasto|agregar gasto|anotar gasto|transferí(?! a mi)|transferi(?! a mi)|comí|comi|bebí|bebi|tomé|tome|mande|mandé|envie|envié|perdí|perdi|presté|preste|devolví|devolvi|debitaron)\b/i },
-  { name: 'add_income', re: /\b(gané|gane|ganó|cobré|cobre|cobró|recibí|recibe|recibió|recibi|me pagaron|me pagó|me ingresó|me ingreso|me ingresaron|me acreditaron|me acreditó|me acredite|me depositaron|me depositó|ingreso|ingresos|percibí|percibe|percibió|percibi|sueldo|salario|cargué|cargue|cargó|cargar|deposité|deposite|depositó|depositar|transferí a mi|me transfirieron|me transferí|transferi a mi|me transferi|entro|entró|llegó|llego plata|mandaron)\b/i },
+  { name: 'correct_transaction', re: /\b(era|fue|fueron|son)\s+(\d+(?:[.,]\d+)?)/i },
+  { name: 'correct_transaction', re: /\b(era|fue|fueron|son)\s+(en|en la fecha|para el|el)\s+(\d{1,2}(?:\/|-)\d{1,2}(?:\/|-)?\d{2,4}?)/i },
+  { name: 'correct_transaction', re: /\b(era|fue|fueron|son)\s+(en|en la moneda)\s+(usd|ars|d[oó]lares|pesos)/i },
+  { name: 'correct_transaction', re: /\b(pasalo|convertilo|cambialo)\s+a\s+(usd|ars|d[oó]lares|pesos)/i }, // "pasalo a USD"
+  { name: 'correct_transaction', re: /^\s*\*+\d+(?:[.,]\d+)?\s*$/ },
+  { name: 'correct_transaction', re: /^\s*\d+(?:[.,]\d+)?\*+\s*$/ },
+  { name: 'correct_transaction', re: /\*\s*(\d+(?:[.,]\d+)?)/ },
+  { name: 'correct_transaction', re: /\b([A-Za-zñÑáéíóúÁÉÍÓÚ\.]+\*)/ },
 
-  // Presupuestos
-  { name: 'check_budget', re: /\b(puedo gastar|me alcanza|tengo presupuesto|presupuesto disponible|cuánto me queda|cómo voy con|estado de|situación de).*(presupuesto|gasto|categoría|para)\b/i },
-  { name: 'check_budget', re: /\b(puedo comprar|me da el cuero|llego a fin de mes)\b/i },
+  // Aportes a metas (prioridad sobre gastos por palabras clave)
+  { name: 'add_contribution', re: /\b(deposité|deposite|depositó|destiné|destine|destinó|puse|agregué|agreque|agregó)\b.*\b(para|en)\b/i }, // "puse 500 para..."
+  { name: 'add_contribution', re: /\b(agregue|agregué|sume|sumé)\s+\d+/i }, // "agregué 500" (fuerte indicador de aporte si hay contexto, o edición si no)
+  // ... resto de add_contribution mas abajo ...
 
-  // Creación/Asignación
-  { name: 'create_budget', re: /\b(presupuesto|presupuesto de|gastar máximo|quiero gastar|asigno|asignar|límite de gasto|aumentar presupuesto|subir presupuesto|agregar.*presupuesto)\b/i },
-  { name: 'create_budget', re: /\b(en.*no gastar más de|un máximo de.*para)\b/i },
+  // Retirar de metas (prioridad sobre gastos basicos "saqué")
+  // "saqué 5 de brasil" -> debe ser withdraw_goal, no add_expense
+  { name: 'withdraw_goal', re: /\b(sacar|retirar|usar|extraer|descontar|gastar|tomar|quitar|quite|saco|saque|saqué|usé|use).*(de la meta|del ahorro|de lo guardado|de la hucha)\b/i },
+  { name: 'withdraw_goal', re: /\b(sacar|retirar|usar|quitar|quite|saco|saque|saqué|usé|use)\s+(\d+(?:[.,]\d+)?).*(de|del|desde)\s+([A-Za-z0-9ñÑáéíóúÁÉÍÓÚ\s]+)/i }, // "saqué 5 de brasil" -> captura fuerte
 
-  // Metas/objetivos
-  { name: 'create_goal', re: /\b(meta|ahorrar|ahorro|guardar|objetivo|juntar|poner aparte para)\b/i },
   { name: 'create_goal', re: /\b(quiero juntar|quiero ahorrar|mi meta es|objetivo de)\b/i },
   { name: 'add_contribution', re: /\b(ahorré|ahorre|ahorró|guardé|guarde|guardó|aparté|aparte|apartó|separé|separe|separó|puse aparte|puse|agregué|agregue|agregó|deposité|deposite|depositó|destiné|destine|destinó)\b.*\b(meta|ahorro|objetivo)\b/i },
 
@@ -235,13 +243,29 @@ export async function parseMessage(message: string): Promise<NLUResult> {
   if (/transfer[ií]/i.test(message)) {
     entities.category = 'transferencia';
   }
-  // Monto - Manejo de formato argentino (puntos como miles, comas opcionales)
-  const amountMatch = message.match(/\b(\d+(?:\.\d{3})*(?:,\d+)?)\b/);
-  if (amountMatch) {
-    const raw = amountMatch[1];
-    // Reemplazar puntos (miles) por nada, y comas (decimales) por puntos
-    const normalized = raw.replace(/\./g, '').replace(/,/g, '.');
-    entities.amount = parseFloat(normalized);
+  // Monto - Manejo de formato argentino
+  const amountMatchesAll = Array.from(message.matchAll(/\b(\d+(?:\.\d{3})*(?:,\d+)?)\b/g));
+  let bestAmountCandidate = null;
+
+  for (const m of amountMatchesAll) {
+    const raw = m[1];
+    const normalized = parseFloat(raw.replace(/\./g, '').replace(/,/g, '.'));
+
+    // Filtro anti-año: Si es un numero de 4 digitos entre 1900 y 2100,
+    // y NO tiene simbolo de moneda pegado, y el mensaje tiene contexto de fecha, ignorarlo.
+    // O mas simple: si es 2026 y estamos en 2026, probablemente sea el año.
+    const isLikelyYear = normalized >= 1990 && normalized <= 2100 && raw.length === 4;
+    // Si tiene signo $ antes, es plata seguro
+    const checksOut = !isLikelyYear || message.includes(`$${raw}`) || message.includes(`$ ${raw}`);
+
+    if (checksOut) {
+      bestAmountCandidate = normalized;
+      break; // Quedarse com el primer monto válido
+    }
+  }
+
+  if (bestAmountCandidate !== null) {
+    entities.amount = bestAmountCandidate;
   }
 
   // installments (cuotas) - detección básica rule-based
@@ -519,6 +543,7 @@ ENTIDADES A EXTRAER SEGÚN EL INTENT:
 - Para gastos/ingresos: amount, currency, merchant, category, description (UNA DESCRIPCION CORTA Y COHERENTE BASADA EN EL MENSAJE, ej: "Sueldo", "Venta de auto", "Pago luz"), year, month, day, account (ej: "Efectivo", "Banco", "Tarjeta"), paymentMethod ("efectivo", "debito", "credito", "transferencia"), creditDetails (solo para gastos: installments, interestRate)
 - Para presupuestos - CREAR (create_budget): category, month, year, amount, currency, operation ("set" para fijar/crear, "add" para agregar/aumentar). (Ej: "QUIERO gastar 300" -> set, "AGREGAR 300 al presupuesto" -> add)
 - Para presupuestos - CONSULTAR (check_budget): category, month, year, amount (si pregunta si puede gastar X). (Ej: "PUEDO gastar?", "Me alcanza?", "Cómo voy?")
+- Para corrección (correct_transaction): amount, currency, deadline (fecha), category (o description para nombre), account. (Ej: "Era 500", "Cambiar a USD", "Era el 5/12", "Cambiar nombre a Auto")
 - Para metas: amount, currency, description, goalName, categories (array de strings), deadline (fecha límite si se menciona), year, month
 - Para cuentas: name (IMPORTANTE: extraer el nombre específico del banco o institución mencionada, NO "nueva cuenta" ni palabras genéricas. Ej: "banco nacion", "Galicia", "BBVA", "Efectivo"), type ("cash", "bank", "card", "investment"), currency, primary, reconciled, archived
 - Para categorías: name, type ("income" o "expense"), icon, color
@@ -632,6 +657,7 @@ REGLAS ADICIONALES:
 - Si el usuario pregunta por "suscripciones", "duplicados", "pagos recurrentes" o menciona servicios como Netflix/Spotify sin monto (consulta), responde con intent "check_subscriptions".
 - Si el usuario saluda o pide ayuda ("hola", "ayuda", "qué podés hacer"), responde con intent "help".
 - Si el usuario quiere CORREGIR una transacción anterior (ej: "no, era 1500", "corrigi el monto", "era con tarjeta", "1200*", "Uala*"), responde con intent "correct_transaction" y extrae entities para lo que cambie: amount (si corrige monto), account (si corrige cuenta), category (si corrige categoría).
+- Si el usuario quiere sacar plata de una meta (ej: "sacar 500 de vacaciones", "quite 7 de nyc"), responde con intent "withdraw_goal" y extrae entities: amount (monto a sacar), goalName (nombre de la meta), description (motivo opcional).
 
 EJEMPLOS:
 - "¿Puedo comprarme una heladera de 800000 en 12 cuotas?" → {"intent": "purchase_advice", "confidence": 0.99, "entities": {"item": "heladera", "amount": 800000, "installments": 12, "currency": "ARS"}}
