@@ -1,4 +1,4 @@
-# FinAize AI Service
+# Finaize AI Service
 
 - Node + TS + Express, API-Key en header `x-api-key`
 - Endpoints: /health (público), /ai/ping, /ai/version, /ai/categorize, /ai/categorize/batch
