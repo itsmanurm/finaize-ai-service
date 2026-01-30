@@ -310,10 +310,10 @@ export async function queryTopExpenses(payload: { year?: number; month?: number;
     const transactions: any[] = await res.json();
 
     // Filter and Sort (Backend returns list, we need top 3 by amount)
-    // Filter out internal transfers if any remain (backend usually handles this but safety check)
-    // And sort desc by amount
+    // NOTE: Backend already excludes internal transfers (transactionType: 'transferencia')
+    // These are normal egreso transactions, possibly with paymentMethod: 'transferencia'
     const top = transactions
-      .filter(t => t.transactionType === 'egreso' && !t.isInternalTransfer)
+      .filter(t => t.transactionType === 'egreso')
       .sort((a: any, b: any) => b.amount - a.amount)
       .slice(0, 3);
 
@@ -369,30 +369,19 @@ export async function querySummary(payload: { items?: any[]; classifyMissing?: b
 
     const transactions: any[] = await res.json();
 
+    // IMPORTANT: Backend already filters out internal transfers (transactionType: 'transferencia')
+    // These are normal transactions (ingreso/egreso) that may use paymentMethod: 'transferencia'
+    // When user asks "cuánto gasté en transferencias", they mean paymentMethod, not transactionType
     let totalIncome = 0, totalExpense = 0;
 
-    // Logic: 
-    // If category is 'transferencia', sum all as expense? or split?
-    // Previous logic: if cat==transferencia, sum as expense.
-    const isTransferCat = category && normalize(category) === 'transferencia';
+    for (const t of transactions) {
+      const val = Number(t.amount) || 0;
+      const type = t.transactionType; // 'ingreso', 'egreso'
 
-    if (isTransferCat) {
-      totalExpense = transactions
-        .filter(t => normalize((t.category || {}).name || t.category || '') === 'transferencia')
-        .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-    } else {
-      for (const t of transactions) {
-        // Exclude internal transfers 
-        if (t.isInternalTransfer === true) continue;
-
-        const val = Number(t.amount) || 0;
-        const type = t.transactionType; // 'ingreso', 'egreso'
-
-        if (type === 'ingreso' || (val < 0 && !type)) {
-          totalIncome += Math.abs(val);
-        } else if (type === 'egreso' || (val > 0 && !type)) {
-          totalExpense += Math.abs(val);
-        }
+      if (type === 'ingreso' || (val < 0 && !type)) {
+        totalIncome += Math.abs(val);
+      } else if (type === 'egreso' || (val > 0 && !type)) {
+        totalExpense += Math.abs(val);
       }
     }
 

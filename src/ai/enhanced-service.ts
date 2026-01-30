@@ -173,22 +173,11 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
     }
   }
 
-  // 4.2 Transfers
-  if (input.transactionType === 'transferencia' || lowerDesc.includes('transferencia') || lowerDesc.includes('transf')) {
-    // If positive -> Ingresos (usually). If negative -> Transferencias.
-    const isIncome = input.amount > 0;
-    const result: CategorizeOutput = {
-      category: isIncome ? 'Ingresos' : 'Transferencias',
-      confidence: 0.8,
-      reasons: ['heuristic:keyword_transfer'],
-      merchant_clean,
-      dedupHash: dedupHash({ amount: input.amount, when: input.when, merchant_clean, accountLast4: input.accountLast4, bankMessageId: input.bankMessageId }),
-      aiEnhanced: false
-    };
-    await setCachedCategorization(cacheKey, result);
-    return result;
-  }
+  // NOTE: Internal transfers (transactionType: 'transferencia') should never reach this service
+  // They are filtered at the route level. This service only categorizes normal transactions.
+  // If a transaction has paymentMethod: 'transferencia', that's fine - it's a payment method, not a transfer type.
 
+  // LAYER 5: Rules (Existing Regex)
   const bag = [merchant_clean, input.description].filter(Boolean).join(' ').trim();
 
   const common = {
