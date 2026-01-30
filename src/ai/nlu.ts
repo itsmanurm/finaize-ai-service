@@ -112,10 +112,22 @@ const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
   // Aportes a metas (prioridad sobre gastos por palabras clave)
   { name: 'add_contribution', re: /\b(deposité|deposite|depositó|destiné|destine|destinó|puse|agregué|agreque|agregó)\b.*\b(para|en)\b/i }, // "puse 500 para..."
   { name: 'add_contribution', re: /\b(agregue|agregué|sume|sumé)\s+\d+/i }, // "agregué 500" (fuerte indicador de aporte si hay contexto, o edición si no)
-  // ... resto de add_contribution mas abajo ...
 
-  // Retirar de metas (prioridad sobre gastos basicos "saqué")
-  // "saqué 5 de brasil" -> debe ser withdraw_goal, no add_expense
+  // --- UNDO / DELETE LAST ACTION ---
+  // "Borrar lo ultimo", "Deshacer", "Me arrepenti", "Cancela eso", "Borra la meta", "Borrar transaccion"
+  // Needs to be distinct from "Delete Data" (GDPR style) usually handled explicitly differently.
+  // This is context-dependent deletion.
+  { name: 'undo_creation', re: /\b(deshacer|deshacé|deshace|cancelar|cancelalo|cancelá|anular|anulalo|revertir|revertilo)\b/i },
+  { name: 'undo_creation', re: /\b(me arrepentr?[íi]|no (lo )?hagas|mejor no|olvidalo|olvida eso)\b/i },
+  // "Borrar" variants, being careful not to match "borrar datos" (unless we want to?)
+  // Matching "borrar" + generic reference ("eso", "lo ultimo", "la transaccion", "el gasto")
+  { name: 'undo_creation', re: /\b(borrar?|eliminar?|suprimir?|quita(lo|r)?)\s+(lo|eso|la|el|últim[oa]|transacci[óo]n|gasto|ingreso|meta|categor[íi]a|cuenta|carga)\b/i },
+  // Simple conversational "borralo", "eliminalo"
+  { name: 'undo_creation', re: /\b(borral[oa]|eliminal[oa]|sacal[oa])\b/i },
+
+  // ---------------------------------------------------------
+  // REGLAS ESPECÍFICAS (Orden de prioridad)
+  // ---------------------------------------------------------> debe ser withdraw_goal, no add_expense
   { name: 'withdraw_goal', re: /\b(sacar|retirar|usar|extraer|descontar|gastar|tomar|quitar|quite|saco|saque|saqué|usé|use).*(de la meta|del ahorro|de lo guardado|de la hucha)\b/i },
   { name: 'withdraw_goal', re: /\b(sacar|retirar|usar|quitar|quite|saco|saque|saqué|usé|use)\s+(\d+(?:[.,]\d+)?).*(de|del|desde)\s+([A-Za-z0-9ñÑáéíóúÁÉÍÓÚ\s]+)/i }, // "saqué 5 de brasil" -> captura fuerte
 
@@ -394,7 +406,7 @@ export async function parseMessage(message: string): Promise<NLUResult> {
 
   // Si el intent es "accion directa" o coincide con una regla específica de alta importancia (como purchase_advice)
   // DEBEMOS RETORNAR ANTES de que el heurístico de "múltiples montos" lo confunda con una lista de gastos.
-  const HIGH_PRIORITY_INTENTS = ['purchase_advice', 'query_dollar_rate', 'query_market_info', 'analyze_financial_profile', 'query_top_expenses'];
+  const HIGH_PRIORITY_INTENTS = ['purchase_advice', 'query_dollar_rate', 'query_market_info', 'analyze_financial_profile', 'query_top_expenses', 'undo_creation'];
   if (matchedIntent && HIGH_PRIORITY_INTENTS.includes(matchedIntent)) {
     logNLU('info', `High priority intent detected, skipping multi-item heuristic: ${matchedIntent}`);
     return { intent: matchedIntent, confidence: 0.95, entities: normalizeEntities(entities, matchedIntent) };
@@ -517,7 +529,7 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
   }
 
   // Para intents de "acción directa" que no necesitan OpenAI, retornar inmediatamente
-  const DIRECT_ACTION_INTENTS = ['query_dollar_rate', 'query_market_info', 'analyze_financial_profile', 'query_top_expenses'];
+  const DIRECT_ACTION_INTENTS = ['query_dollar_rate', 'query_market_info', 'analyze_financial_profile', 'query_top_expenses', 'undo_creation'];
   if (matchedIntent && DIRECT_ACTION_INTENTS.includes(matchedIntent)) {
     logNLU('info', `Direct action intent detected, skipping OpenAI: ${matchedIntent}`);
     return { intent: matchedIntent, confidence: 0.95, entities: normalizeEntities(entities, matchedIntent) };
@@ -657,6 +669,7 @@ REGLAS ADICIONALES:
 - Si el usuario pregunta por "suscripciones", "duplicados", "pagos recurrentes" o menciona servicios como Netflix/Spotify sin monto (consulta), responde con intent "check_subscriptions".
 - Si el usuario saluda o pide ayuda ("hola", "ayuda", "qué podés hacer"), responde con intent "help".
 - Si el usuario quiere CORREGIR una transacción anterior (ej: "no, era 1500", "corrigi el monto", "era con tarjeta", "1200*", "Uala*"), responde con intent "correct_transaction" y extrae entities para lo que cambie: amount (si corrige monto), account (si corrige cuenta), category (si corrige categoría).
+- Si el usuario quiere DESHACER, ELIMINAR O BORRAR la última acción o creación (ej: "borralo", "me arrepentí", "deshacer", "cancelar", "elimina esa carga", "borra el gasto"), responde con intent "undo_creation".
 - Si el usuario quiere sacar plata de una meta (ej: "sacar 500 de vacaciones", "quite 7 de nyc"), responde con intent "withdraw_goal" y extrae entities: amount (monto a sacar), goalName (nombre de la meta), description (motivo opcional).
 
 EJEMPLOS:
