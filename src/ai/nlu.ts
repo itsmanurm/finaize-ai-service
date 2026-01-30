@@ -88,6 +88,15 @@ const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
   { name: 'query_summary', re: /\b(cuánto gasté?|cuánto gasto|resumen|balance|total de gastos|mis gastos|cuál fue|en el (mes|año|trimestre))\b/i },
   { name: 'query_summary', re: /\b(desde que|en los últimos|últimos \d+ (días|meses)).*gast/i },
 
+  // Corrección de transacciones
+  { name: 'correct_transaction', re: /\b(correg[ií]|cambi[aá]|modific[aá]|edit[aá]|actualiz[aá]|arregl[aá])\b.*\b(monto|cantidad|cuenta|categor[ií]a|precio|valor|importe)\b/i },
+  { name: 'correct_transaction', re: /\b(no (era|fueron|fue)|en realidad (era|fueron|fue)|mejor dicho|quise decir|me equivoqu[eé]|le err[eé])\b/i },
+  { name: 'correct_transaction', re: /\b(era|fue|fueron|son)\s+(\d+(?:[.,]\d+)?)/i }, // "era 1200" (sin asterisco necesario si tiene palabra clave)
+  { name: 'correct_transaction', re: /^\s*\*+\d+(?:[.,]\d+)?\s*$/ }, // "*1200" obligatorio asterisco inicio (si es solo numero)
+  { name: 'correct_transaction', re: /^\s*\d+(?:[.,]\d+)?\*+\s*$/ }, // "1200*" obligatorio asterisco fin (si es solo numero)
+  { name: 'correct_transaction', re: /\*\s*(\d+(?:[.,]\d+)?)/ }, // *1200 en texto
+  { name: 'correct_transaction', re: /\b([A-Za-zñÑáéíóúÁÉÍÓÚ]+\*)/ }, // Palabra con asterisco: "Comida*"
+
   // Gastos/ingresos
   { name: 'add_expense', re: /\b(gasté|gaste|gastó|pagué|pague|pagó|compré|compre|compró|saqué|saque|sacó|retiré|retire|retiró|extraje|extrajo|me cobraron|me cobró|me descontaron|salió|salio|salieron|gasto|pago|compro|saco|retiro|registrar gasto|agregar gasto|anotar gasto|transferí(?! a mi)|transferi(?! a mi)|comí|comi|bebí|bebi|tomé|tome|mande|mandé|envie|envié|perdí|perdi|presté|preste|devolví|devolvi|debitaron)\b/i },
   { name: 'add_income', re: /\b(gané|gane|ganó|cobré|cobre|cobró|recibí|recibe|recibió|recibi|me pagaron|me pagó|me ingresó|me ingreso|me ingresaron|me acreditaron|me acreditó|me acredite|me depositaron|me depositó|ingreso|ingresos|percibí|percibe|percibió|percibi|sueldo|salario|cargué|cargue|cargó|cargar|deposité|deposite|depositó|depositar|transferí a mi|me transfirieron|me transferí|transferi a mi|me transferi|entro|entró|llegó|llego plata|mandaron)\b/i },
@@ -622,6 +631,7 @@ REGLAS ADICIONALES:
 - Si el usuario pregunta por categorización, responde con intent "categorize".
 - Si el usuario pregunta por "suscripciones", "duplicados", "pagos recurrentes" o menciona servicios como Netflix/Spotify sin monto (consulta), responde con intent "check_subscriptions".
 - Si el usuario saluda o pide ayuda ("hola", "ayuda", "qué podés hacer"), responde con intent "help".
+- Si el usuario quiere CORREGIR una transacción anterior (ej: "no, era 1500", "corrigi el monto", "era con tarjeta", "1200*", "Uala*"), responde con intent "correct_transaction" y extrae entities para lo que cambie: amount (si corrige monto), account (si corrige cuenta), category (si corrige categoría).
 
 EJEMPLOS:
 - "¿Puedo comprarme una heladera de 800000 en 12 cuotas?" → {"intent": "purchase_advice", "confidence": 0.99, "entities": {"item": "heladera", "amount": 800000, "installments": 12, "currency": "ARS"}}
@@ -681,6 +691,11 @@ EJEMPLOS:
 - "Gastos de enero vs diciembre" → {"intent": "query_comparison", "confidence": 0.99, "entities": {"month": 1, "year": ${currentYear}, "compare_month": 12, "compare_year": ${lastYear}}}
 - "cuanto gaste en transporte en diciembre 2025" → {"intent": "query_summary", "confidence": 0.99, "entities": {"month": 12, "year": 2025, "category": "transporte"}}
 - "resumen de gastos de mayo" → {"intent": "query_summary", "confidence": 0.99, "entities": {"month": 5, "year": ${currentYear}}}
+- "no, era 5000" → {"intent": "correct_transaction", "confidence": 0.99, "entities": {"amount": 5000}}
+- "5000*" → {"intent": "correct_transaction", "confidence": 0.99, "entities": {"amount": 5000}}
+- "en realidad fue en efectivo" → {"intent": "correct_transaction", "confidence": 0.99, "entities": {"account": "Efectivo", "paymentMethod": "efectivo"}}
+- "cambia la categoria a comida" → {"intent": "correct_transaction", "confidence": 0.99, "entities": {"category": "comida"}}
+- "era con Uala" → {"intent": "correct_transaction", "confidence": 0.99, "entities": {"account": "Ualá"}}
 
 EJEMPLO DE SALIDA JSON (FORMATO ESTRICTO):
 - Input: "Cobre 5000"
