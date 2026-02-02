@@ -83,5 +83,5 @@ app.use((req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  logger.info(`[ai-service] listening on :${PORT}`);
+  logger.info(`[Sistema] ✅ Servicio de IA escuchando en el puerto ${PORT}`);
 });

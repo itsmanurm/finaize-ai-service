@@ -49,14 +49,14 @@ type NLUResult = {
  * Logger helper para NLU
  */
 function logNLU(level: 'info' | 'warn' | 'error', msg: string, data?: any) {
-  const timestamp = new Date().toISOString();
-  const logMsg = `[${timestamp}] [NLU] ${msg}`;
+  // Solo logueamos errores y advertencias de forma ruidosa, info se silencia o usa [IA]
+  const logMsg = `[IA] ${msg}`;
   if (level === 'error') {
-    console.error(logMsg, data || '');
+    console.error(`[IA] ❌ ${msg}`, data || '');
   } else if (level === 'warn') {
-    console.warn(logMsg, data || '');
+    console.warn(`[IA] ⚠️ ${msg}`, data || '');
   } else {
-    console.log(logMsg, data || '');
+    // console.log(logMsg, data || '');
   }
 }
 
@@ -204,7 +204,7 @@ export async function parseMessage(message: string): Promise<NLUResult> {
   if (/desde que\s+(abr[ií]|abierta?|tens|tengo|cuenta|inicio)/i.test(message) || /desde que abr/i.test(message)) {
     entities.all_time = true;
     entities.period = 'all_time';
-    logNLU('info', 'Detected all_time period: "desde que abrí la cuenta"');
+    // logNLU('info', 'Detectado periodo histórico (all_time)');
   }
 
   // FECHAS RELATIVAS: ayer, anteayer, hace X días, el viernes, etc. (solo si no es all_time)
@@ -399,7 +399,7 @@ export async function parseMessage(message: string): Promise<NLUResult> {
   for (const r of INTENT_RULES) {
     if (r.re.test(message)) {
       matchedIntent = r.name;
-      logNLU('info', `Intent matched by rule: ${r.name}`);
+      // logNLU('info', `Intent identificado por regla: ${r.name}`);
       break;
     }
   }
@@ -408,7 +408,7 @@ export async function parseMessage(message: string): Promise<NLUResult> {
   // DEBEMOS RETORNAR ANTES de que el heurístico de "múltiples montos" lo confunda con una lista de gastos.
   const HIGH_PRIORITY_INTENTS = ['purchase_advice', 'query_dollar_rate', 'query_market_info', 'analyze_financial_profile', 'query_top_expenses', 'undo_creation'];
   if (matchedIntent && HIGH_PRIORITY_INTENTS.includes(matchedIntent)) {
-    logNLU('info', `High priority intent detected, skipping multi-item heuristic: ${matchedIntent}`);
+    // logNLU('info', `Intent de alta prioridad detectado, saltando heurística de lista: ${matchedIntent}`);
     return { intent: matchedIntent, confidence: 0.95, entities: normalizeEntities(entities, matchedIntent) };
   }
 
@@ -498,12 +498,12 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
             entities: normalizeEntities({ ...entities, ...(parsedEntities || {}) }, parsed.intent || 'add_expense_list')
           };
         } catch (e) {
-          console.warn('[NLU] Error parseando JSON OpenAI para multi-items:', e);
+          console.warn('[IA] ⚠️ Error parseando JSON OpenAI para multi-items:', e);
           // fallback heurístico
         }
       }
     } catch (err) {
-      console.warn('[NLU] OpenAI multi-item failed:', (err as any)?.message || err);
+      console.warn('[IA] ⚠️ Falló OpenAI para múltiples items:', (err as any)?.message || err);
       // continuar a fallback heurístico
     }
     // Fallback heurístico si OpenAI falla
@@ -531,7 +531,7 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
   // Para intents de "acción directa" que no necesitan OpenAI, retornar inmediatamente
   const DIRECT_ACTION_INTENTS = ['query_dollar_rate', 'query_market_info', 'analyze_financial_profile', 'query_top_expenses', 'undo_creation'];
   if (matchedIntent && DIRECT_ACTION_INTENTS.includes(matchedIntent)) {
-    logNLU('info', `Direct action intent detected, skipping OpenAI: ${matchedIntent}`);
+    // logNLU('info', `Acción directa detectada, saltando OpenAI: ${matchedIntent}`);
     return { intent: matchedIntent, confidence: 0.95, entities: normalizeEntities(entities, matchedIntent) };
   }
 

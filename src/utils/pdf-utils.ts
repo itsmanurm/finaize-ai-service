@@ -10,13 +10,13 @@ import { getPdfjsLib } from './pdf-converter';
  */
 export async function extractTextFromPdf(base64: string): Promise<string> {
   try {
-    console.log('[PDF Utils] Extracting text from PDF via pdfjs-dist...');
-    
+    // console.log('[Sistema] Extrayendo texto de PDF vía pdfjs-dist...');
+
     const buffer = Buffer.from(base64, 'base64');
     const uint8Array = new Uint8Array(buffer);
-    
+
     const pdfjsLib = await getPdfjsLib();
-    
+
     // Configuración mínima para cargar el documento solo para texto
     const loadingTask = pdfjsLib.getDocument({
       data: uint8Array,
@@ -25,30 +25,30 @@ export async function extractTextFromPdf(base64: string): Promise<string> {
     });
 
     const pdf = await loadingTask.promise;
-    console.log('[PDF Utils] Document loaded, pages:', pdf.numPages);
-    
+    // console.log('[Sistema] Documento cargado, páginas:', pdf.numPages);
+
     let fullText = '';
-    
+
     // Extraer texto de todas las páginas (o límite seguro)
     const maxPages = Math.min(pdf.numPages, 5);
-    
+
     for (let i = 1; i <= maxPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        
-        // Unir items de texto con espacios
-        const pageText = textContent.items
-            .map((item: any) => item.str)
-            .join(' ');
-            
-        fullText += pageText + '\n\n';
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+
+      // Unir items de texto con espacios
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(' ');
+
+      fullText += pageText + '\n\n';
     }
-    
-    console.log('[PDF Utils] Text extracted, length:', fullText.length);
-    
+
+    // console.log('[Sistema] Texto extraído, longitud:', fullText.length);
+
     return fullText;
   } catch (error: any) {
-    console.error('[PDF Utils] Error extracting text:', error.message);
+    console.error('[Sistema] ❌ Error extrayendo texto:', error.message);
     return '';
   }
 }
@@ -61,8 +61,8 @@ export function isPdfScanned(extractedText: string, pageCount: number = 1): bool
   // Si hay menos de 50 caracteres por página, probablemente es escaneado
   const charsPerPage = extractedText.length / pageCount;
   const isScanned = charsPerPage < 50;
-  
-  console.log(`[PDF Utils] Chars per page: ${charsPerPage}, isScanned: ${isScanned}`);
+
+  // console.log(`[Sistema] Chars por página: ${charsPerPage}, isScanned: ${isScanned}`);
   return isScanned;
 }
 
@@ -97,7 +97,7 @@ export async function getPdfInfo(base64: string): Promise<{
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pdfParse = require('pdf-parse');
     const data = await pdfParse(buffer);
-    
+
     return {
       pageCount: data.numpages,
       hasText: data.text.length > 100,

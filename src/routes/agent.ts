@@ -24,7 +24,7 @@ r.post('/chat', async (req, res) => {
     const message = await agentChatCompletion(parse.data);
     return res.json({ ok: true, reply: message });
   } catch (error: any) {
-    console.error('[Agent Chat] Error:', error);
+    console.error('[IA] ❌ Error en Chat de Agente:', error);
     return res.status(500).json({ ok: false, error: error.message });
   }
 });
@@ -43,7 +43,7 @@ r.post('/forecast', async (req, res) => {
     const validTransactions: { date: Date, value: number }[] = [];
 
     if (Array.isArray(transactions)) {
-      console.log(`[AI-Service] Incoming transactions count: ${transactions.length}`);
+      // console.log(`[Sistema] Cantidad de transacciones entrantes: ${transactions.length}`);
       transactions.forEach((t, i) => {
         if (t.when && t.amount !== undefined) {
           const d = new Date(t.when);
@@ -57,13 +57,13 @@ r.post('/forecast', async (req, res) => {
       });
     }
 
-    console.log(`[AI-Service] Parsed ${validTransactions.length} valid transactions.`);
+    console.log(`[IA] ✅ Se procesaron ${validTransactions.length} transacciones válidas.`);
 
     // 2. Split into Historical vs Current Month
     // USE UTC consistently to avoid timezone shifts
     const targetMonth = now.getUTCMonth();
     const targetYear = now.getUTCFullYear();
-    console.log(`[AI-Service] Target Month: ${targetMonth} (0-indexed), Target Year: ${targetYear}`);
+    // console.log(`[Sistema] Mes objetivo: ${targetMonth} (0-indexed), Año objetivo: ${targetYear}`);
 
     const historicalData: { date: Date, value: number }[] = [];
     const currentMonthData: { date: Date, value: number }[] = [];
@@ -79,11 +79,11 @@ r.post('/forecast', async (req, res) => {
       }
     });
 
-    console.log(`[AI-Service] Split: Historical=${historicalData.length}, CurrentMonth=${currentMonthData.length}`);
+    // console.log(`[Sistema] División: Histórica=${historicalData.length}, Mes Actual=${currentMonthData.length}`);
     const currentSum = currentMonthData.reduce((s, t) => s + t.value, 0);
-    console.log(`[AI-Service] Current Month Accumulated: ${currentSum}`);
+    // console.log(`[Sistema] Acumulado Mes Actual: ${currentSum}`);
     if (currentMonthData.length > 0) {
-      console.log(`[AI-Service] First Current Month Data: ${JSON.stringify(currentMonthData[0])}`);
+      // console.log(`[Sistema] Primer dato del Mes Actual: ${JSON.stringify(currentMonthData[0])}`);
     }
 
     // 3. Generate Forecast with Real Data
@@ -101,8 +101,8 @@ r.post('/forecast', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Forecast error:', error);
-    res.status(500).json({ ok: false, error: 'Failed to generate forecast' });
+    console.error('[Sistema] ❌ Error en pronóstico:', error);
+    res.status(500).json({ ok: false, error: 'Error al generar pronóstico' });
   }
 });
 

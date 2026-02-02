@@ -196,7 +196,7 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
   // Validar configuración de AI_MIN_CONFIDENCE
   const minConf = config.AI_MIN_CONFIDENCE;
   if (isNaN(minConf) || minConf <= 0 || minConf > 1) {
-    console.warn('AI_MIN_CONFIDENCE no está configurado correctamente. Usando valor por defecto: 0.6');
+    console.warn('[Sistema] ⚠️ AI_MIN_CONFIDENCE no está configurado correctamente. Usando valor por defecto: 0.6');
   }
 
   // LAYER 6: AI (OpenAI) - Generative Fallback
@@ -238,7 +238,7 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
 
             return res;
           } catch (err: any) {
-            console.error('OpenAI categorization error (detailed):', {
+            console.error('[Sistema] ❌ Error detallado en categorización OpenAI:', {
               message: err?.message,
               status: err?.status || err?.response?.status,
               stack: err?.stack
@@ -253,11 +253,11 @@ export async function categorize(input: CategorizeInput): Promise<CategorizeOutp
         try {
           return await p;
         } catch (err) {
-          console.warn('OpenAI categorization failed, falling back to rules:', (err as any)?.message || err);
+          console.warn('[Sistema] ⚠️ Falló la categorización OpenAI, usando reglas locales:', (err as any)?.message || err);
         }
       }
     } catch (error) {
-      console.warn('OpenAI categorization failed, falling back to rules:', (error as any)?.message || error);
+      console.warn('[Sistema] ⚠️ Falló la categorización OpenAI, usando reglas locales:', (error as any)?.message || error);
     }
   }
 
@@ -317,7 +317,7 @@ export async function categorizeBatch(
       try {
         return await categorize({ ...input, useAI });
       } catch (error) {
-        console.error(`Error categorizing transaction ${i}:`, error);
+        console.error(`[Sistema] ❌ Error categorizando transacción ${i}:`, error);
         // Retornar categorización por defecto en caso de error
         return {
           category: 'Sin clasificar',

@@ -31,15 +31,15 @@ export async function sendNotificationToBackend(payload: NotificationPayload): P
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-      console.error('[Notification Client] Failed to send notification:', error);
+      console.error('[Sistema] ❌ Falló el envío de notificación:', error);
       return false;
     }
 
     const result = await response.json();
-    console.log('[Notification Client] Notification sent successfully:', result);
+    // console.log('[Sistema] Notificación enviada con éxito:', result);
     return true;
   } catch (error) {
-    console.error('[Notification Client] Error sending notification:', error);
+    console.error('[Sistema] ❌ Error enviando notificación:', error);
     return false;
   }
 }

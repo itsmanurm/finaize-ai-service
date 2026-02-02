@@ -83,7 +83,7 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
   const lower = text.toLowerCase();
   const clean = text.replace(/\s+/g, ' ').trim();
 
-  console.log('[Heuristics] Attempting text analysis, length:', clean.length);
+  // console.log('[Sistema] Intentando análisis por heurísticas, longitud:', clean.length);
 
   let detectedDocType = DocumentType.OTRO;
   let direction = TransferDirection.INDETERMINADO;
@@ -291,14 +291,14 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
       // Ignorar si está precedido por "sub", "p.", "precio", "neto" (si es que la regex de total matcheó solo "total")
       // Ejemplo: "Sub Total", "P. Total", "Precio Total", "Importe Base"
       if (/(?:sub|p\.|precio|neto|base)\s*$/.test(prefixWindow)) {
-        console.log(`[Heuristics] Ignoring match due to prefix: "${prefixWindow}" -> "${fullMatch}"`);
+        // console.log(`[Sistema] Ignorando coincidencia por prefijo: "${prefixWindow}" -> "${fullMatch}"`);
         continue;
       }
 
       const parsed = parseFlexibleAmount(rawAmount);
       if (parsed !== null && parsed > 0) {
         validTotalCandidates.push(parsed);
-        console.log(`[Heuristics] Candidate TOTAL: ${parsed} (from "${fullMatch}")`);
+        // console.log(`[Sistema] Candidato a TOTAL: ${parsed} (de "${fullMatch}")`);
       }
     }
   }
@@ -329,7 +329,7 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
     const maxTotal = Math.max(...validTotalCandidates);
     detectedFields.monto = maxTotal;
     confidence = 0.9;
-    console.log(`[Heuristics] Selected BEST TOTAL from candidates: ${maxTotal} (candidates: ${validTotalCandidates.join(', ')})`);
+    // console.log(`[Sistema] Mejor TOTAL seleccionado: ${maxTotal} (candidatos: ${validTotalCandidates.join(', ')})`);
     montoFound = true;
   }
 
@@ -363,7 +363,7 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
     if (maxMonto > 0) {
       detectedFields.monto = maxMonto;
       confidence = Math.max(confidence, 0.7);
-      console.log('[Heuristics] Selected MAX monto:', maxMonto);
+      // console.log('[Sistema] Monto MAX seleccionado:', maxMonto);
     }
   }
 
@@ -380,7 +380,7 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
 
   const currentYear = new Date().getFullYear();
   const minYear = currentYear - 1; // Solo aceptar fechas recientes (ej. 2025-2026)
-  console.log(`[Heuristics] Date extraction - Current Year: ${currentYear}, Min Year: ${minYear}`);
+  // console.log(`[Sistema] Extracción de fecha - Año actual: ${currentYear}, Año min: ${minYear}`);
 
   for (const pattern of fechaPatterns) {
     // Usamos loop global para filtrar fechas viejas
@@ -389,7 +389,7 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
     let bestFecha = null;
 
     while ((match = globalPat.exec(clean)) !== null) {
-      console.log(`[Heuristics] Date match found with pattern: ${pattern.source}`, match[0]);
+      // console.log(`[Sistema] Coincidencia de fecha encontrada: ${pattern.source}`, match[0]);
       let day, month, year;
 
       // Intentar inferir grupos según patrón
@@ -433,7 +433,7 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
         } else {
           year = String(currentYear);
         }
-        console.log(`[Heuristics] Inferred year ${year} for date ${day}/${month}`);
+        // console.log(`[Sistema] Año inferido ${year} para fecha ${day}/${month}`);
       } else {
         // Fallback genérico
         day = match[1]; month = match[2]; year = match[3];
@@ -444,7 +444,7 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
 
       // FILTRO CRÍTICO
       if (Number(year) < minYear) {
-        console.log(`[Heuristics] Ignoring old date: ${day}/${month}/${year}`);
+        // console.log(`[Sistema] Ignorando fecha antigua: ${day}/${month}/${year}`);
         continue;
       }
 
@@ -466,7 +466,7 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
     if (bestFecha) {
       detectedFields.fecha = bestFecha;
       confidence = Math.max(confidence, 0.75);
-      console.log('[Heuristics] Found valid fecha:', bestFecha);
+      // console.log('[Sistema] Fecha válida encontrada:', bestFecha);
       break;
     }
   }
@@ -488,7 +488,7 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
     else if (lower.includes('trenes argentinos') || lower.includes('operadora ferroviaria')) detectedFields.nombreContraparte = 'Trenes Argentinos';
 
     if (detectedFields.nombreContraparte) {
-      console.log('[Heuristics] Inferred Service Provider:', detectedFields.nombreContraparte);
+      // console.log('[Sistema] Proveedor inferido:', detectedFields.nombreContraparte);
     }
   }
 
@@ -508,7 +508,7 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
         // Exclude if it looks like a date or technical info
         if (!/^\d|Fecha|operación|comprobante|banco|estado|número/i.test(candidate) && candidate.length > 2) {
           detectedFields.nombreContraparte = candidate;
-          console.log('[Heuristics] Found contraparte:', detectedFields.nombreContraparte);
+          // console.log('[Sistema] Contraparte encontrada:', detectedFields.nombreContraparte);
           break;
         }
       }
@@ -522,7 +522,7 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
     );
     if (conceptoMatch?.[1]) {
       detectedFields.concepto = conceptoMatch[1].trim();
-      console.log('[Heuristics] Found concepto:', detectedFields.concepto);
+      // console.log('[Sistema] Concepto encontrado:', detectedFields.concepto);
     }
   }
 
@@ -551,16 +551,16 @@ export function analyzeTextHeuristics(text: string): DocumentAnalysisResult | nu
   // ===== DECIDIR SI DEVUELVO =====
   const hasMinimum = !!detectedFields.monto && !!detectedFields.fecha;
   if (!hasMinimum) {
-    console.log('[Heuristics] Insufficient data (needs monto+fecha), delegating to GPT');
+    // console.log('[Sistema] Datos insuficientes (falta monto+fecha), delegando a GPT');
     return null;
   }
 
-  console.log('[Heuristics] Success with heuristics!', {
-    docType: detectedDocType,
-    direction,
-    monto: detectedFields.monto,
-    fecha: detectedFields.fecha,
-  });
+  // console.log('[Sistema] ¡Éxito con heurísticas!', {
+  //   docType: detectedDocType,
+  //   direction,
+  //   monto: detectedFields.monto,
+  //   fecha: detectedFields.fecha,
+  // });
 
   return {
     detectedDocType,
@@ -585,11 +585,11 @@ export async function analyzeDocument(
   fileType: string,
   userContext?: { userId?: string; recentTransactions?: any[] }
 ): Promise<DocumentAnalysisResult> {
-  console.log('[analyzeDocument] Starting vision analysis for:', fileName);
+  // console.log('[IA] Iniciando análisis de visión para:', fileName);
 
   try {
     const openai = getOpenAIClient();
-    console.log('[analyzeDocument] OpenAI client obtained successfully');
+    // console.log('[IA] Cliente OpenAI obtenido con éxito');
 
     // Remover prefijo data:image si existe
     const cleanBase64 = base64Image.replace(/^data:image\/[a-z]+;base64,/, '');
@@ -663,7 +663,7 @@ FORMATO DE RESPUESTA (JSON puro, sin markdown):
   "reasoning": "Breve explicación"
 }`;
 
-    console.log('[Document Analyzer] Analyzing document:', fileName);
+    // console.log('[IA] Analizando documento:', fileName);
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -691,7 +691,7 @@ FORMATO DE RESPUESTA (JSON puro, sin markdown):
       throw new Error('No se recibió respuesta del modelo');
     }
 
-    console.log('[Document Analyzer] Raw response length:', content.length);
+    // console.log('[IA] Longitud de respuesta cruda:', content.length);
 
     // Parsear JSON, manejando posibles bloques de markdown
     let jsonText = content.trim();
@@ -700,17 +700,19 @@ FORMATO DE RESPUESTA (JSON puro, sin markdown):
       jsonText = jsonText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
     }
 
-    console.log('[Document Analyzer] Parsing JSON, length:', jsonText.length);
+    // console.log('[IA] Parseando JSON, longitud:', jsonText.length);
 
     const result: DocumentAnalysisResult = JSON.parse(jsonText);
 
-    console.log('[Document Analyzer] Analysis complete:', {
+    /*
+    console.log('[IA] Análisis completo:', {
       docType: result.detectedDocType,
       direction: result.direction,
       confidence: result.confidenceScores?.global,
       entityType: result.suggestedEntityType,
       hasAmount: !!result.detectedFields?.monto
     });
+    */
 
     // Validaciones y defaults
     if (!result.detectedDocType) {
@@ -732,13 +734,13 @@ FORMATO DE RESPUESTA (JSON puro, sin markdown):
     // FIX: Normalizar fecha a mediodía para evitar problemas de timezone en frontend
     if (result.detectedFields.fecha && /^\d{4}-\d{2}-\d{2}$/.test(result.detectedFields.fecha)) {
       result.detectedFields.fecha = `${result.detectedFields.fecha}T12:00:00.000Z`;
-      console.log('[Document Analyzer] Date normalized to T12:00:', result.detectedFields.fecha);
+      // console.log('[IA] Fecha normalizada a T12:00:', result.detectedFields.fecha);
     }
 
     return result;
 
   } catch (error: any) {
-    console.error('[Document Analyzer] Error analyzing document:', error);
+    console.error('[IA] ❌ Error analizando documento:', error);
 
     // Fallback: retornar análisis básico
     return {
@@ -764,33 +766,35 @@ export async function analyzeDocumentText(
   fileName: string,
   userContext?: { userId?: string; recentTransactions?: any[] }
 ): Promise<DocumentAnalysisResult> {
-  console.log('[Documents] analyzeDocumentText started, text length:', text.length);
+  // console.log('[IA] analyzeDocumentText iniciado, longitud de texto:', text.length);
 
   // STEP 1: Clean text
   const cleanText = text.replace(/\s+/g, ' ').trim();
-  console.log('[Documents] Text cleaned, length:', cleanText.length);
+  // console.log('[IA] Texto limpio, longitud:', cleanText.length);
 
   // STEP 2: TRY HEURISTICS FIRST (no GPT cost)
-  console.log('[Documents] Attempting heuristic analysis...');
+  // console.log('[IA] Intentando análisis por heurísticas...');
   const heuristicResult = analyzeTextHeuristics(cleanText);
 
   if (heuristicResult &&
     heuristicResult.detectedFields?.monto &&
     heuristicResult.detectedFields?.fecha) {
-    console.log('[Documents] ✅ Heuristics successful! Using result, skipping GPT-4');
-    console.log('[Documents] Heuristic result:', {
+    console.log('[IA] ✅ ¡Heurísticas exitosas! Usando resultado, saltando GPT-4');
+    /*
+    console.log('[IA] Resultado heurístico:', {
       monto: heuristicResult.detectedFields.monto,
       fecha: heuristicResult.detectedFields.fecha,
       contraparte: heuristicResult.detectedFields.nombreContraparte,
       confidence: heuristicResult.confidenceScores.global
     });
+    */
     return heuristicResult;
   }
 
   if (heuristicResult) {
-    console.log('[Documents] Heuristics partial (missing critical fields), will use GPT as fallback');
+    // console.log('[IA] Heurísticas parciales (faltan campos críticos), usando GPT como fallback');
   } else {
-    console.log('[Documents] Heuristics returned null, delegating to GPT-4');
+    // console.log('[IA] Heurísticas devolvieron null, delegando a GPT-4');
   }
 
   // STEP 3: Fallback to GPT-4

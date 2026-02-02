@@ -20,15 +20,15 @@ r.post('/parse', async (req, res) => {
   }
 
   try {
-    console.log(`[AI Parse] Processing message: "${message.substring(0, 50)}..."`);
+    // console.log(`[IA] Procesando mensaje: "${message.substring(0, 50)}..."`);
     const result = await parseMessage(message);
 
     // Log resultado
-    console.log(`[AI Parse]Result - Intent: ${result.intent}, Confidence: ${result.confidence} `);
+    // console.log(`[IA] Resultado - Intent: ${result.intent}, Confidence: ${result.confidence} `);
 
     return res.json({ ok: true, ...result });
   } catch (error: any) {
-    console.error('[AI Parse] Error:', error);
+    console.error('[IA] ❌ Error en Parse:', error);
 
     // Fallback: retornar unknown intent pero no fallar
     return res.status(500).json({
@@ -215,7 +215,7 @@ r.post('/analyze-profile', async (req, res) => {
   }
 
   try {
-    console.log(`[AI Analyze Profile] Analizando ${transactions.length} transacciones, ${timeframeMonths || 6} meses`);
+    console.log(`[IA] ✅ Analizando perfil financiero: ${transactions.length} transacciones, ${timeframeMonths || 6} meses`);
 
     const profile = analyzeFinancialProfile({
       transactions: transactions.filter((t: any) => t.isAdjustment !== true),
@@ -240,7 +240,7 @@ r.post('/analyze-profile', async (req, res) => {
           subscription.merchant,
           subscription.avgAmount,
           frequencyCount
-        ).catch(err => console.error('[Analyze Profile] Failed to send subscription notification:', err));
+        ).catch(err => console.error('[IA] ❌ Error al enviar notificación de suscripción:', err));
       }
     }
 
@@ -249,7 +249,7 @@ r.post('/analyze-profile', async (req, res) => {
       ...profile
     });
   } catch (error: any) {
-    console.error('[AI Analyze Profile] Error:', error);
+    console.error('[IA] ❌ Error en Análisis de Perfil:', error);
     return res.status(500).json({
       ok: false,
       error: 'Error analizando perfil',
@@ -284,7 +284,7 @@ r.post('/forecast', async (req, res) => {
     const currentMonth = now.getUTCMonth() + 1; // 1-12
     const currentMonthPrefix = `${currentYear}-${currentMonth.toString().padStart(2, '0')}`;
 
-    console.log(`[AI-Service] Current Month Target: ${currentMonthPrefix}`);
+    // console.log(`[Sistema] Mes objetivo para pronóstico: ${currentMonthPrefix}`);
 
     const historicalPointsMap = new Map<string, number>();
     const currentPointsMap = new Map<string, number>();
@@ -314,7 +314,7 @@ r.post('/forecast', async (req, res) => {
     const historicalData = Array.from(historicalPointsMap.entries()).map(([d, v]) => ({ date: new Date(d), value: v }));
     const currentData = Array.from(currentPointsMap.entries()).map(([d, v]) => ({ date: new Date(d), value: v }));
 
-    console.log(`[AI-Service] Forecast Split: History=${historicalData.length}, CurrentMonth=${currentData.length}`);
+    // console.log(`[Sistema] División de Pronóstico: Histórico=${historicalData.length}, Mes Actual=${currentData.length}`);
 
     const { ForecastingService } = await import('../ai/forecasting');
 
@@ -363,7 +363,7 @@ r.post('/forecast', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('[AI Forecast] Error:', error);
+    console.error('[Sistema] ❌ Error en Pronóstico AI:', error);
     return res.status(500).json({ ok: false, error: error.message });
   }
 });
@@ -395,7 +395,7 @@ r.post('/anomalies', async (req, res) => {
             anomaly.category,
             anomaly.reason,
             anomaly.severity
-          ).catch(err => console.error('[Anomalies] Failed to send notification:', err));
+          ).catch(err => console.error('[IA] ❌ Error al enviar notificación de anomalía:', err));
         }
       }
     }
@@ -406,7 +406,7 @@ r.post('/anomalies', async (req, res) => {
       anomalies
     });
   } catch (error: any) {
-    console.error('[AI Anomalies] Error:', error);
+    console.error('[IA] ❌ Error en Anomalías AI:', error);
     return res.status(500).json({ ok: false, error: error.message });
   }
 });

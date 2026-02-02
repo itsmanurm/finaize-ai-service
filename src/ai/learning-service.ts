@@ -118,10 +118,10 @@ export async function loadFeedbackMemory(force = false) {
         }
 
         lastLoadTime = Date.now();
-        console.log(`[LearningService] Loaded ${memoryBank.size} learned patterns from feedback.`);
+        console.log(`[IA] ✅ Se cargaron ${memoryBank.size} patrones aprendidos desde el feedback.`);
 
     } catch (error) {
-        console.error('[LearningService] Error loading feedback:', error);
+        console.error('[IA] ❌ Error al cargar memoria de feedback:', error);
     }
 }
 

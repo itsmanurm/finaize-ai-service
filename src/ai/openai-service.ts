@@ -181,7 +181,7 @@ export async function categorizeWithOpenAI(input: OpenAICategorizationInput): Pr
 
   const VALID_MODELS = ['gpt-4o-mini', 'gpt-4o', 'gpt-4'];
   if (!VALID_MODELS.includes(model)) {
-    console.warn(`Modelo ${model} no está en lista whitelist, pero intentaremos usarlo.`);
+    // console.warn(`[IA] ⚠️ Modelo ${model} no está en lista whitelist, pero intentaremos usarlo.`);
   }
 
   try {
@@ -228,9 +228,7 @@ export async function categorizeWithOpenAI(input: OpenAICategorizationInput): Pr
       if (match) {
         finalCategory = match;
       } else {
-        console.warn(`AI returned invalid category: "${category}". Fallbacking to "Sin clasificar" or keeping simple.`);
-        // Si no existe, podríamos aceptarla o forzar 'Sin clasificar'. 
-        // Para ser estrictos con el sistema:
+        // console.warn(`[IA] ⚠️ La IA devolvió una categoría inválida: "${category}". Usando "Sin clasificar".`);
         finalCategory = 'Sin clasificar';
       }
     }
@@ -246,7 +244,7 @@ export async function categorizeWithOpenAI(input: OpenAICategorizationInput): Pr
     };
 
   } catch (error: any) {
-    console.error('Error en OpenAI:', {
+    console.error('[IA] ❌ Error en OpenAI:', {
       message: error.message,
       model,
       inputDescription: input.description
@@ -274,7 +272,7 @@ export async function categorizeBatchOpenAI(
       try {
         return await categorizeWithOpenAI(input);
       } catch (error) {
-        console.error(`Error categorizing transaction ${i}:`, error);
+        console.error(`[IA] ❌ Error categorizando transacción ${i}:`, error);
         // Retornar categorización por defecto en caso de error
         return {
           category: 'Sin clasificar',
@@ -316,7 +314,7 @@ export async function agentChatCompletion(params: {
 
     return completion.choices[0].message;
   } catch (error: any) {
-    console.error('Error en Agent Chat Completion:', error.message);
-    throw new Error(`OpenAI Agent API error: ${error.message}`);
+    console.error('[IA] ❌ Error en Agent Chat Completion:', error.message);
+    throw new Error(`Error de API de Agente OpenAI: ${error.message}`);
   }
 }

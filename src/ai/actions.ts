@@ -45,7 +45,7 @@ export async function queryMarketInfo(payload: { activo?: string; period?: strin
     };
 
   } catch (error) {
-    console.error('Error fetching market info:', error);
+    // console.error('[Sistema] ❌ Error consultando info de mercado:', error);
     return { ok: false, error: 'Failed to fetch market data', activos: [] };
   }
 }
@@ -198,7 +198,7 @@ export async function actionAddIncome(payload: {
     return { ok: true, record };
 
   } catch (err: any) {
-    console.error('[actionAddIncome] Error:', err);
+    console.error('[IA] ❌ Error en Registro de Ingreso:', err);
     return { ok: false, error: err.message };
   }
 }
@@ -310,7 +310,7 @@ export async function actionAddExpense(payload: {
     return { ok: true, record, warning };
 
   } catch (err: any) {
-    console.error('[actionAddExpense] Error:', err);
+    console.error('[IA] ❌ Error en Registro de Gasto:', err);
     return { ok: false, error: err.message };
   }
 }
@@ -362,7 +362,7 @@ export async function queryTopExpenses(payload: { year?: number; month?: number;
     });
 
     if (!res.ok) {
-      console.error('[queryTopExpenses] Backend error:', res.status);
+      console.error('[IA] ❌ Error de Backend en Top Gastos:', res.status);
       return { ok: false, error: 'Failed to fetch transactions', topExpenses: [] };
     }
 
@@ -384,7 +384,7 @@ export async function queryTopExpenses(payload: { year?: number; month?: number;
     };
 
   } catch (error: any) {
-    console.error('[queryTopExpenses] Error:', error.message);
+    console.error('[IA] ❌ Error en Consulta de Top Gastos:', error.message);
     return { ok: false, error: error.message, topExpenses: [] };
   }
 }
@@ -422,7 +422,7 @@ export async function querySummary(payload: { items?: any[]; classifyMissing?: b
     });
 
     if (!res.ok) {
-      console.error('[querySummary] Backend error:', res.status);
+      console.error('[IA] ❌ Error de Backend en Resumen:', res.status);
       return { ok: false, error: 'Failed to fetch data for summary' };
     }
 
@@ -452,7 +452,7 @@ export async function querySummary(payload: { items?: any[]; classifyMissing?: b
     };
 
   } catch (error: any) {
-    console.error('[querySummary] Error:', error.message);
+    console.error('[IA] ❌ Error en Resumen:', error.message);
     return { ok: false, error: error.message };
   }
 }
