@@ -1,5 +1,5 @@
 // Central config loader and validator
-import dotenv from 'dotenv';
+import * as dotenv from 'dotenv';
 dotenv.config();
 
 function requireEnv(key: string): string {

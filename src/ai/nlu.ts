@@ -43,6 +43,9 @@ type NLUResult = {
   intent: string;
   confidence: number;
   entities: Entities;
+  userMode?: 'action' | 'consulta' | 'analisis' | 'emocional' | 'exploratorio';
+  _reasoning?: string;
+  _reformulation?: string;
 };
 
 /**
@@ -153,7 +156,7 @@ const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
   { name: 'general_knowledge', re: /\b(cómo|cómo hago|cómo puedo|qué es|enseña|explica|tips?|consejos?|aprende?|estrategia)\b.*\b(ahorr|presupuest|deud|finanz|dinero|gasto)\b/i },
 ];
 
-export async function parseMessage(message: string): Promise<NLUResult> {
+export async function parseMessage(message: string, context?: any): Promise<NLUResult> {
   // Normalización de entidades para downstream
   function normalizeEntities(e: Entities, intent: string): Entities {
     const out: Entities = { ...e };
@@ -549,28 +552,77 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
     const lastYear = currentYear - 1;
     const nextYear = currentYear + 1;
 
-    const prompt = `Eres un parser de intención financiera experto. Tu tarea es identificar el intent y extraer entidades del mensaje. Responde SOLO JSON con las keys: intent, confidence, entities. Siempre responde en español.
+    const prompt = `Eres un parser de intención financiera experto. TU OBJETIVO PRINCIPAL: INTERPRETAR LA INTENCIÓN REAL DEL USUARIO.
+    
+    CONTEXTO HISTÓRICO (ÚLTIMAS TRANSACCIONES):
+    ${context?.recentTransactions ? JSON.stringify(context.recentTransactions.slice(0, 5), null, 2) : 'No disponible'}
+    
+    INSTRUCCIONES DE RAZONAMIENTO (CHAIN OF THOUGHT):
+    0. REFORMULACIÓN INTERNA (CRÍTICO):
+       - Reescribe mentalmente el mensaje del usuario a su versión más Clara, Explícita y Completa posible.
+       - Resuelve implícitos ("lo de ayer" -> "gasto de fecha X").
+       - Escribe esto en el campo "_reformulation".
+    1. FORMULA UNA HIPÓTESIS PRINCIPAL (Basada en la Reformulación):
+       - ¿Qué crees que el usuario intenta lograr realmente?
+       - ¿Por qué? (Justificación basada en el mensaje y el contexto).
+       - Si tu hipótesis no es fuerte o es ambigua, DEBES bajar la confianza (confidence < 0.7).
+    2. Analiza paso a paso el mensaje del usuario.
+    3. Identifica referencias temporales, menciones implícitas ("lo de siempre") y emociones.
+    4. DETECTA EL MODO DEL USUARIO (userMode):
+       - "acción": Quiere que algo ocurra (gastar, crear, borrar). Ej: "Cargué nafta", "Crear meta", "Borrá eso".
+       - "consulta": Pregunta datos o estado. Ej: "Cuánto gasté?", "Cómo viene mi presupuesto?".
+       - "analisis": Quiere entender su situación profunda. Ej: "Por qué no llego a fin de mes?", "En qué se me va la plata?".
+       - "emocional": Expresa frustración, culpa, sorpresa, enojo. Ej: "Me fui al carajo", "Qué desastre", "Estoy gastando mucho".
+       - "exploratorio": Hipótesis o futuros. Ej: "Qué pasa si compro esto?", "Me conviene?".
+    4. REGLA DE SEGURIDAD:
+       - Si userMode es "emocional", "exploratorio" o "analisis" -> EL INTENT NO PUEDE SER DE ACCIÓN (como add_expense).
+       - En esos casos, mapear a "analyze_financial_profile", "help" o "purchase_advice".
+    5. Cruza con CONTEXTO HISTÓRICO.
+    6. Escribe tu razonamiento en "_reasoning".
+    
+    INSTRUCCIONES DE INTERPRETACIÓN AVANZADA:
+    1. REFERENCIAS VAGAS ("Lo de siempre", "Como la última vez", "Repetí la carga"): usa el CONTEXTO HISTÓRICO.
+    2. EMOCIONES/JUICIOS ("Me fui al carajo", "Estoy gastando mucho"):
+       - userMode: "emocional".
+       - Intent: "analyze_financial_profile" (o "help").
+       - NO crear gasto "Me fui al carajo".
+    3. CONSULTAS COMPUESTAS ("Cargue 5000 de nafta y compre unos chicles"):
+       - userMode: "acción".
+       - Intent: "add_expense_list".
+    
+    
+    PRINCIPIOS DE INTERPRETACIÓN (JERARQUÍA DE PRIORIDAD):
+    1. **OBJETIVO DEL USUARIO** (¿Qué quiere lograr? Más allá de las palabras).
+    2. **CONTEXTO FINANCIERO** (¿Tiene sentido en su historial? Si recién compró algo, ¿está corrigiendo?).
+    3. **PALABRAS LITERALES** (Úsalas solo como guía, no como ley. Si dice "Borrar" pero el contexto es emocional ("Borrá ese recuerdo"), prioriza el objetivo emocional).
+    
+    INSTRUCCIÓN DE GENERALIZACIÓN:
+    - NO dependas de ejemplos exactos.
+    - Generalizá patrones de lenguaje humano (argot, errores de tipeo, frases cortas).
+    - Si el usuario dice "Estoy seco", entiende el concepto "Sin dinero" (Contexto) -> "analyze_financial_profile".
 
-ENTIDADES A EXTRAER SEGÚN EL INTENT:
-- Para gastos/ingresos: amount, currency, merchant, category, description (UNA DESCRIPCION CORTA Y COHERENTE BASADA EN EL MENSAJE, ej: "Sueldo", "Venta de auto", "Pago luz"), year, month, day, account (ej: "Efectivo", "Banco", "Tarjeta"), paymentMethod ("efectivo", "debito", "credito", "transferencia"), creditDetails (solo para gastos: installments, interestRate)
-- Para presupuestos - CREAR (create_budget): category, month, year, amount, currency, operation ("set" para fijar/crear, "add" para agregar/aumentar). (Ej: "QUIERO gastar 300" -> set, "AGREGAR 300 al presupuesto" -> add)
-- Para presupuestos - CONSULTAR (check_budget): category, month, year, amount (si pregunta si puede gastar X). (Ej: "PUEDO gastar?", "Me alcanza?", "Cómo voy?")
-- Para corrección (correct_transaction): amount, currency, deadline (fecha), category (o description para nombre), account. (Ej: "Era 500", "Cambiar a USD", "Era el 5/12", "Cambiar nombre a Auto")
-- Para metas: amount, currency, description, goalName, categories (array de strings), deadline (fecha límite si se menciona), year, month
-- Para cuentas: name (IMPORTANTE: extraer el nombre específico del banco o institución mencionada, NO "nueva cuenta" ni palabras genéricas. Ej: "banco nacion", "Galicia", "BBVA", "Efectivo"), type ("cash", "bank", "card", "investment"), currency, primary, reconciled, archived
-- Para categorías: name, type ("income" o "expense"), icon, color
-- Para asesoría de compra (purchase_advice): item (nombre del producto), amount (precio total), installments (número de cuotas), interest_free (boolean, true si explícitamente dice sin interés o s/i), interest_rate (número, porcentaje de interés anual o mensual especificado)
+    Responde SOLO JSON con las keys: _reformulation, _reasoning, userMode, intent, confidence, entities. Siempre responde en español.
 
-IMPORTANTE - MONTOS Y FORMATO ARGENTINO:
-- Extraer solo el número del monto, sin puntos ni comas
-- "1.000" o "1,000" → amount: 1000
-- "50.000" → amount: 50000
-- "2.5" o "2,5" → amount: 2.5 (para decimales)
-- "1k" → amount: 1000
-- Si no se especifica moneda explícitamente, asumir ARS (pesos argentinos) por defecto
-- Detectar moneda: "dólares", "USD", "verdes", "palos verdes" → USD
-- Detectar moneda: "pesos", "ARS", "$", "pe" → ARS
-- CONTEXTO ARGENTINO: "$" sin aclaración significa ARS, no USD
+    ENTIDADES A EXTRAER SEGÚN EL INTENT:
+    - Para gastos/ingresos: amount, currency, merchant, category, description (UNA DESCRIPCION CORTA Y COHERENTE BASADA EN EL MENSAJE, ej: "Sueldo", "Venta de auto", "Pago luz"), year, month, day, account (ej: "Efectivo", "Banco", "Tarjeta"), paymentMethod ("efectivo", "debito", "credito", "transferencia"), creditDetails (solo para gastos: installments, interestRate)
+    - Para presupuestos - CREAR (create_budget): category, month, year, amount, currency, operation ("set" para fijar/crear, "add" para agregar/aumentar). (Ej: "QUIERO gastar 300" -> set, "AGREGAR 300 al presupuesto" -> add)
+    - Para presupuestos - CONSULTAR (check_budget): category, month, year, amount (si pregunta si puede gastar X). (Ej: "PUEDO gastar?", "Me alcanza?", "Cómo voy?")
+    - Para corrección (correct_transaction): amount, currency, deadline (fecha), category (o description para nombre), account. (Ej: "Era 500", "Cambiar a USD", "Era el 5/12", "Cambiar nombre a Auto")
+    - Para metas: amount, currency, description, goalName, categories (array de strings), deadline (fecha límite si se menciona), year, month
+    - Para cuentas: name (IMPORTANTE: extraer el nombre específico del banco o institución mencionada, NO "nueva cuenta" ni palabras genéricas. Ej: "banco nacion", "Galicia", "BBVA", "Efectivo"), type ("cash", "bank", "card", "investment"), currency, primary, reconciled, archived
+    - Para categorías: name, type ("income" o "expense"), icon, color
+    - Para asesoría de compra (purchase_advice): item (nombre del producto), amount (precio total), installments (número de cuotas), interest_free (boolean, true si explícitamente dice sin interés o s/i), interest_rate (número, porcentaje de interés anual o mensual especificado)
+
+    IMPORTANTE - MONTOS Y FORMATO ARGENTINO:
+    - Extraer solo el número del monto, sin puntos ni comas
+    - "1.000" o "1,000" → amount: 1000
+    - "50.000" → amount: 50000
+    - "2.5" o "2,5" → amount: 2.5 (para decimales)
+    - "1k" → amount: 1000
+    - Si no se especifica moneda explícitamente, asumir ARS (pesos argentinos) por defecto
+    - Detectar moneda: "dólares", "USD", "verdes", "palos verdes" → USD
+    - Detectar moneda: "pesos", "ARS", "$", "pe" → ARS
+    - CONTEXTO ARGENTINO: "$" sin aclaración significa ARS, no USD
 
     - CRÍTICO - DESCRIPCIONES INTELIGENTES (description):
       * NO DEJAR VACÍO el campo description, source o merchant.
@@ -799,7 +851,10 @@ Mensaje: "${message}"`;
         return {
           intent: parsed.intent || matchedIntent || 'unknown',
           confidence: Math.min(1.0, Math.max(0, parsed.confidence || (matchedIntent ? 0.95 : 0.5))),
-          entities: normalizeEntities({ ...entities, ...(parsed.entities || {}) }, parsed.intent || matchedIntent || 'unknown')
+          entities: normalizeEntities({ ...entities, ...(parsed.entities || {}) }, parsed.intent || matchedIntent || 'unknown'),
+          userMode: parsed.userMode,
+          _reasoning: parsed._reasoning,
+          _reformulation: parsed._reformulation
         };
       } catch (e) {
         logNLU('warn', `JSON parse error: ${(e as any)?.message} `, { jsonText: jsonText.substring(0, 100) });

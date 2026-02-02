@@ -21,7 +21,8 @@ r.post('/parse', async (req, res) => {
 
   try {
     // console.log(`[IA] Procesando mensaje: "${message.substring(0, 50)}..."`);
-    const result = await parseMessage(message);
+    const { message, userId, context } = req.body || {};
+    const result = await parseMessage(message, context);
 
     // Log resultado
     // console.log(`[IA] Resultado - Intent: ${result.intent}, Confidence: ${result.confidence} `);
