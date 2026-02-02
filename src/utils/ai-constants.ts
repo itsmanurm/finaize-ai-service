@@ -109,11 +109,7 @@ export const SUSCRIPCIONES = [
     "The Economist",
     "Medium", "Medium Membership",
 
-    // Gimnasios / Bienestar (Cadenas grandes)
-    "Megatlon",
-    "SportClub",
-    "Fiter",
-    "On Fit", "OnFit",
+    // Bienestar (apps)
     "Headspace",
     "Calm",
     "Strava", "Strava Subscription",
