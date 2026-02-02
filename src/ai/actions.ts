@@ -96,9 +96,18 @@ export async function actionQueryDollar() {
 }
 
 // Acción real: registrar ingreso
-export async function actionAddIncome(payload: { amount: number; account?: string; category?: string; token?: string }) {
+export async function actionAddIncome(payload: {
+  amount: number;
+  account?: string;
+  category?: string;
+  token?: string;
+  year?: number;
+  month?: number;
+  day?: number;
+  date?: string; // ISO or YYYY-MM-DD
+}) {
   const backendUrl = process.env.FINAIZE_BACKEND_URL || 'http://localhost:3001';
-  const { amount, account, token, category } = payload;
+  const { amount, account, token, category, year, month, day, date } = payload;
 
   if (!token) return { ok: false, error: 'Auth required' };
   if (!amount) return { ok: false, error: 'Monto requerido' };
@@ -126,8 +135,38 @@ export async function actionAddIncome(payload: { amount: number; account?: strin
       return { ok: false, error: 'No se encontró una cuenta válida.' };
     }
 
-    // If explicit account was requested but not found (logic above tries partial match), 
-    // strictly speaking we might want to be stricter. But let's rely on the find.
+    let when = new Date().toISOString();
+    if (date) {
+      when = date;
+    } else if (year && month) {
+      // Construct date. IMPORTANT: We send Y,M,D to backend if possible, or ISO.
+      // Backend expects 'when' as ISO usually.
+      // If we construct local here, it might be weird. 
+      // Let's use the Date constructor but be careful.
+      // Ideally, the backend AI controller should receive year/month/day and handle construction.
+      // BUT `actions.ts` calls `POST /api/transactions` directly!
+      // So we must pass `year`, `month`, `day` in the payload OR a correct `when`.
+      // The `transaction.routes.ts` (standard API) expects `when` (usually ISO) or now `YYYY-MM-DD`.
+
+      // Let's rely on the new `Date.UTC(y, m-1, d, 3, 0, 0)` logic we are adding to backend routes.
+      // We will send standard ISO if possible, but correctly shifted?
+      // Actually, if we pass `year`, `month`, `day`, the backend `POST /api/transactions` 
+      // DOES NOT accept separate fields by default (unless we change it, which we plan to do in ai.controller but this is hitting routes!).
+      // Wait, `actionAddIncome/Expense` hits `/api/transactions`.
+      // The `ai.controller.ts` is ONLY for `/api/ai/chat` flow.
+      // THESE actions are tools called by the Agent Runner likely?
+      // Or by `enhanced-service`?
+      // `enhanced-service` does NOT call these actions.
+      // The Agent Runner calls these actions.
+
+      // So:
+      // If I call `/api/transactions`, I need to send `when`.
+      // If I have Year/Month/Day, I should construct a valid Argentina Midnight ISO here.
+      const d = day || 1;
+      // Argentina Midnight = 03:00 UTC
+      const dateObj = new Date(Date.UTC(year, month - 1, d, 3, 0, 0));
+      when = dateObj.toISOString();
+    }
 
     // 2. Create Transaction
     const txPayload = {
@@ -137,7 +176,7 @@ export async function actionAddIncome(payload: { amount: number; account?: strin
       account: targetAccount.name,
       transactionType: 'ingreso',
       paymentMethod: 'efectivo', // Default
-      when: new Date().toISOString(),
+      when: when, // Explicitly set
       confirmed: true
     };
 
@@ -165,9 +204,19 @@ export async function actionAddIncome(payload: { amount: number; account?: strin
 }
 
 // Acción real: registrar gasto
-export async function actionAddExpense(payload: { amount: number; account?: string; category?: string; merchant?: string; token?: string }, forceCreation = false) {
+export async function actionAddExpense(payload: {
+  amount: number;
+  account?: string;
+  category?: string;
+  merchant?: string;
+  token?: string;
+  year?: number;
+  month?: number;
+  day?: number;
+  date?: string;
+}, forceCreation = false) {
   const backendUrl = process.env.FINAIZE_BACKEND_URL || 'http://localhost:3001';
-  const { amount, account, token, category, merchant } = payload;
+  const { amount, account, token, category, merchant, year, month, day, date } = payload;
 
   if (!token) return { ok: false, error: 'Auth required' };
   if (!amount) return { ok: false, error: 'Monto requerido' };
@@ -216,6 +265,16 @@ export async function actionAddExpense(payload: { amount: number; account?: stri
       };
     }
 
+    let when = new Date().toISOString();
+    if (date) {
+      when = date;
+    } else if (year && month) {
+      const d = day || 1;
+      // Argentina Midnight = 03:00 UTC
+      const dateObj = new Date(Date.UTC(year, month - 1, d, 3, 0, 0));
+      when = dateObj.toISOString();
+    }
+
     // 4. Crear Transacción
     const txPayload = {
       amount: Math.abs(amount), // Ensure positive for storage unless logic differs
@@ -225,7 +284,7 @@ export async function actionAddExpense(payload: { amount: number; account?: stri
       accountId: targetAccount._id, // Adding ID helps backend
       transactionType: 'egreso',
       paymentMethod: 'efectivo',
-      when: new Date().toISOString(),
+      when: when,
       confirmed: true
     };
 
