@@ -149,6 +149,8 @@ const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
 
   // Consultar Metas
   { name: 'check_goals', re: /\b(cómo (voy|van|vienen) mis metas|cómo voy con el ahorro|cuánto (llevo|tengo) ahorrado|estado de mis objetivos|mis metas)\b/i },
+  { name: 'check_goals', re: /\b(cuánto (me )?(falta|queda|necesito)|progreso (de|en)|avance (de|en)|cuánto ahorré)\b.*\b(meta|objetivo|ahorro)\b/i },
+  { name: 'check_goals', re: /\b(para (cumplir|alcanzar|completar|lograr)).*(meta|objetivo)\b/i },
 
   // Categorización
   { name: 'categorize', re: /\b(categoría|¿en qué categor|en qué entra|¿a qué categor)\b/i },
@@ -618,6 +620,7 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
     - Para gastos/ingresos: amount, currency, merchant, category, description (UNA DESCRIPCION CORTA Y COHERENTE BASADA EN EL MENSAJE, ej: "Sueldo", "Venta de auto", "Pago luz"), year, month, day, account (ej: "Efectivo", "Banco", "Tarjeta"), paymentMethod ("efectivo", "debito", "credito", "transferencia"), creditDetails (solo para gastos: installments, interestRate)
     - Para presupuestos - CREAR (create_budget): category, month, year, amount, currency, operation ("set" para fijar/crear, "add" para agregar/aumentar). (Ej: "QUIERO gastar 300" -> set, "AGREGAR 300 al presupuesto" -> add)
     - Para presupuestos - CONSULTAR (check_budget): category, month, year, amount (si pregunta si puede gastar X). (Ej: "PUEDO gastar?", "Me alcanza?", "Cómo voy?")
+    - Para consulta de metas (check_goals): goalName (nombre de la meta si especifica, vacío si pregunta por todas), period (número de meses si menciona "en X mes(es)", ej: "en 1 mes" → period: 1, "en 3 meses" → period: 3), description
     - Para corrección (correct_transaction): amount, currency, deadline (fecha), category (o description para nombre), account. (Ej: "Era 500", "Cambiar a USD", "Era el 5/12", "Cambiar nombre a Auto")
     - Para metas (create_goal): amount (monto objetivo), currency, description, goalName, categories (array de strings), deadline (fecha límite si se menciona), year, month. EXCEPCIÓN: Si el usuario dice "meta de X con Y inicial" o "crear meta y agregarle Y", extraer initialAmount (monto de inicio) y sourceAccount (cuenta de origen) si corresponde.
     - Para cuentas: name (IMPORTANTE: extraer el nombre específico del banco o institución mencionada, NO "nueva cuenta" ni palabras genéricas. Ej: "banco nacion", "Galicia", "BBVA", "Efectivo"), type ("cash", "bank", "card", "investment"), currency, primary, reconciled, archived
@@ -719,6 +722,7 @@ REGLAS ADICIONALES:
 - Si el usuario pregunta "PUEDO gastar", "me alcanza", "cómo voy con el presupuesto", "tengo saldo para", responde con intent "check_budget" y extrae category (si hay), amount (si pregunta por un monto específico), month, year.
 - Si el usuario expresa un deseo de COMPRAR o AHORRAR PARA algo específico ("quiero ahorrar", "meta de", "objetivo de"), responde con intent "create_goal" y extrae amount, currency, description, goalName, categories (array de categorías), deadline (si se menciona), year, month.
 - Si el usuario menciona que YA AHORRÓ o AGREGÓ dinero a una meta existente (ej: "ahorré", "guardé", "puse", "agregué"), responde con intent "add_contribution" y extrae amount, goalName (nombre de la meta), description.
+- Si el usuario PREGUNTA sobre el progreso o estado de sus metas (ej: "cuánto me falta", "cómo voy", "cuánto llevo ahorrado", "progreso de la meta", "para cumplir la meta"), responde con intent "check_goals" y extrae goalName (nombre de la meta si especifica una, vacío si pregunta por todas), period (número de meses si menciona "en X mes(es)"), description.
 - CRÍTICO - Si el usuario menciona que GUARDÓ/AHORRÓ dinero en una meta Y menciona DE DÓNDE SACÓ ese dinero (ej: "guardé 256000 de mi salario en mi fondo", "aporté 50000 de mercado pago a mi meta vacaciones", "puse 100000 de mi sueldo en el fondo de reserva"), responde con intent "add_contribution_with_source" y extrae:
   * amount: monto aportado
   * goalName: nombre de la meta de destino
@@ -810,6 +814,13 @@ EJEMPLOS DE APORTE A META CON ORIGEN DE FONDOS (add_contribution_with_source):
 - "Aporté 50000 de mercado pago a mi meta vacaciones" → {"intent": "add_contribution_with_source", "confidence": 0.99, "entities": {"amount": 50000, "currency": "ARS", "goalName": "vacaciones", "sourceAccount": "Mercado Pago", "description": "Aporte a vacaciones"}}
 - "Puse 100000 del sueldo en el fondo de emergencia" → {"intent": "add_contribution_with_source", "confidence": 0.99, "entities": {"amount": 100000, "currency": "ARS", "goalName": "fondo de emergencia", "sourceAccount": "sueldo", "description": "Aporte desde sueldo"}}
 - "Guardé en mi fondo de reserva 256000 de mi salario" → {"intent": "add_contribution_with_source", "confidence": 0.99, "entities": {"amount": 256000, "currency": "ARS", "goalName": "fondo de reserva", "sourceAccount": "salario", "description": "Aporte desde salario"}}
+
+EJEMPLOS DE CONSULTA DE PROGRESO DE METAS (check_goals):
+- "¿Cuánto me falta para cumplir la meta pago regalo sol en 1 mes?" → {"intent": "check_goals", "confidence": 0.99, "entities": {"goalName": "pago regalo sol", "period": 1}}
+- "¿Cómo voy con mis metas?" → {"intent": "check_goals", "confidence": 0.99, "entities": {}}
+- "Cuánto llevo ahorrado para vacaciones" → {"intent": "check_goals", "confidence": 0.99, "entities": {"goalName": "vacaciones"}}
+- "Progreso de mi meta viaje" → {"intent": "check_goals", "confidence": 0.98, "entities": {"goalName": "viaje"}}
+- "Mis metas" → {"intent": "check_goals", "confidence": 0.99, "entities": {}}
 
 EJEMPLO DE SALIDA JSON (FORMATO ESTRICTO):
 - Input: "Cobre 5000"
