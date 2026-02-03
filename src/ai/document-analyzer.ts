@@ -640,10 +640,12 @@ EXTRAE TODO LO POSIBLE:
 - monto: solo el número, SIN $ ni puntos de miles (ej: 15000.50)
 - moneda: ARS o USD
 - nombreContraparte: El nombre REAL del comercio/persona.
-    - Prioriza LOGOTIPOS grandes o "Razón Social".
-    - EN TRANSFERENCIAS: Busca "Destinatario", "Para", "A nombre de", "Titular". Ej: Si dice "Destinatario: Javier Basualdo", la contraparte es "Javier Basualdo".
-    - IGNORA etiquetas genéricas como "Domicilio Comercial", "Punto de Venta", "Ingresos Brutos", "Caja", "Sucursal".
-    - Si ves "Domicilio Comercial: Farmcity", la contraparte es "Farmcity". NO uses "Domicilio Comercial".
+    - Prioriza LOGOTIPOS grandes (generalmente arriba a la derecha o izquierda) o "Razón Social".
+    - EN FACTURAS DE SERVICIOS: Busca nombres conocidos en la lista (ABSA, Edenor, etc.).
+    - IGNORA etiquetas como "Cliente", "Usuario", "Consumidor Final", "Destinatario" (si es una factura y NO una transferencia).
+    - IGNORA etiquetas técnicas como: "Domicilio Comercial", "Punto de Venta", "Ingresos Brutos", "Caja", "Sucursal", "Unidad de Facturación", "Partido/Partida".
+    - Si ves "Cliente: Sebastián Giordanino", "Sebastián" NO es el comercio. Busca quién emite la factura (ej: Kevingston, KVN SRL).
+    - Si ves "Unidad de Facturación Partido: 055-...", IGNORALO. Busca "ABSA" o el logo.
 - categoria: Servicios, Alimentación, Transporte, Transferencias, Salud, Entretenimiento, etc.
 - empresa: nombre de la empresa emisora
 - concepto: descripción corta del movimiento.
