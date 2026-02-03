@@ -871,15 +871,20 @@ function generateRecommendations(params: {
   // ----------------------------
   if (params.topCategories.length > 0 && params.topCategories[0].percentage > 30) {
     const topCat = params.topCategories[0];
-    recommendations.push({
-      priority: 'Alta',
-      category: 'Reducción de gastos',
-      title: `Optimiza gastos en ${topCat.category}`,
-      description: `Esta categoría representa el ${topCat.percentage}% de tus gastos (${formatCurrency(
-        topCat.amount
-      )}). Reducir un 20% te ahorraría ${formatCurrency(topCat.amount * 0.2)} mensuales.`,
-      potentialSavings: Math.round(topCat.amount * 0.2)
-    });
+    const excludedCategories = ['ahorro', 'inversión', 'inversion', 'transferencia', 'plazos fijos', 'acciones'];
+    
+    // Only suggest optimizing if it's not a savings/investment category
+    if (!excludedCategories.some(exc => topCat.category.toLowerCase().includes(exc))) {
+      recommendations.push({
+        priority: 'Alta',
+        category: 'Reducción de gastos',
+        title: `Optimiza gastos en ${topCat.category}`,
+        description: `Esta categoría representa el ${topCat.percentage}% de tus gastos (${formatCurrency(
+          topCat.amount
+        )}). Reducir un 20% te ahorraría ${formatCurrency(topCat.amount * 0.2)} mensuales.`,
+        potentialSavings: Math.round(topCat.amount * 0.2)
+      });
+    }
   }
 
   // ----------------------------
