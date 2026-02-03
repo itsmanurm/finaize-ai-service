@@ -64,6 +64,20 @@ const cases = [
     expectedIntent: 'add_contribution_with_source',
     expectedEntities: { amount: 256000 }
   },
+  // === NEW: Compound Goal Creation ===
+  {
+    message: 'Crea una meta "Fondos de reserva" y asignale 501000 provenientes de mi salario',
+    expectedIntent: 'create_goal',
+    // We can't strictly test entities without mocking OpenAI, but intent should match via Regex or prompt
+  },
+  {
+    message: 'Nueva meta "Vacaciones" con 50000 iniciales de mi cuenta',
+    expectedIntent: 'create_goal',
+  },
+  {
+    message: 'Crear meta Ahorro poniendo 10000 desde brubank',
+    expectedIntent: 'create_goal',
+  },
 ];
 
 

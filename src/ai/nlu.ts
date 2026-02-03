@@ -112,6 +112,10 @@ const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
   { name: 'correct_transaction', re: /\*\s*(\d+(?:[.,]\d+)?)/ },
   { name: 'correct_transaction', re: /\b([A-Za-zñÑáéíóúÁÉÍÓÚ\.]+\*)/ },
 
+  // Create Goal with Initial Deposit (Compound Command) - Must be BEFORE add_contribution_with_source
+  // "Crea una meta X y asignale Y", "Nueva meta con Z de saldo", "Meta X poniendo W desde Y"
+  { name: 'create_goal', re: /\b(crea|nueva|definir|hacer)\b.*\bmeta\b.*\b(con|y asignale|y ponele|poniendo|ingresando|y sumale)\b/i },
+
   // Aportes a metas CON ORIGEN de fondos (detectar "de mi salario/cuenta")
   // IMPORTANTE: Estas reglas deben ir ANTES de add_contribution simple
   // Detecta patrones como "guardé X de mi salario en mi meta" o "aporté X de mercado pago al fondo"
@@ -339,12 +343,13 @@ export async function parseMessage(message: string, context?: any): Promise<NLUR
 
     // Si el candidato es una billetera conocida, es MERCHANT o ACCOUNT, no categoría
     const isWallet = commonWallets.some(w => candidato.includes(w) || w.includes(candidato));
+    const isPaymentMethod = ['credito', 'debito', 'efectivo', 'transferencia', 'tarjeta', 'crédito', 'débito'].some(pm => candidato.includes(pm));
 
-    // Si es una categoría conocida y NO es una billetera
-    if (!isWallet && knownCategories.some(c => candidato === c || (candidato.length > 3 && c.startsWith(candidato)))) {
+    // Si es una categoría conocida y NO es una billetera ni metodo de pago
+    if (!isWallet && !isPaymentMethod && knownCategories.some(c => candidato === c || (candidato.length > 3 && c.startsWith(candidato)))) {
       category = candidato;
-    } else {
-      // Si no, es un merchant
+    } else if (!isPaymentMethod) {
+      // Si no, es un merchant (siempre que no sea un metodo de pago como "credito")
       merchant = candidato;
     }
   }
@@ -614,7 +619,7 @@ Notas: - Normaliza la moneda a ARS/USD/EUR cuando sea posible. - Si falta descri
     - Para presupuestos - CREAR (create_budget): category, month, year, amount, currency, operation ("set" para fijar/crear, "add" para agregar/aumentar). (Ej: "QUIERO gastar 300" -> set, "AGREGAR 300 al presupuesto" -> add)
     - Para presupuestos - CONSULTAR (check_budget): category, month, year, amount (si pregunta si puede gastar X). (Ej: "PUEDO gastar?", "Me alcanza?", "Cómo voy?")
     - Para corrección (correct_transaction): amount, currency, deadline (fecha), category (o description para nombre), account. (Ej: "Era 500", "Cambiar a USD", "Era el 5/12", "Cambiar nombre a Auto")
-    - Para metas: amount, currency, description, goalName, categories (array de strings), deadline (fecha límite si se menciona), year, month
+    - Para metas (create_goal): amount (monto objetivo), currency, description, goalName, categories (array de strings), deadline (fecha límite si se menciona), year, month. EXCEPCIÓN: Si el usuario dice "meta de X con Y inicial" o "crear meta y agregarle Y", extraer initialAmount (monto de inicio) y sourceAccount (cuenta de origen) si corresponde.
     - Para cuentas: name (IMPORTANTE: extraer el nombre específico del banco o institución mencionada, NO "nueva cuenta" ni palabras genéricas. Ej: "banco nacion", "Galicia", "BBVA", "Efectivo"), type ("cash", "bank", "card", "investment"), currency, primary, reconciled, archived
     - Para categorías: name, type ("income" o "expense"), icon, color
     - Para asesoría de compra (purchase_advice): item (nombre del producto), amount (precio total), installments (número de cuotas), interest_free (boolean, true si explícitamente dice sin interés o s/i), interest_rate (número, porcentaje de interés anual o mensual especificado)

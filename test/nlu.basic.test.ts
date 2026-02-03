@@ -42,4 +42,15 @@ describe('NLU básico', () => {
       });
     }
   });
+
+  it('detecta metodo de pago SIN confundirlo con merchant', async () => {
+    const msg = 'Gaste 6475 en Credito';
+    const result = await parseMessage(msg);
+    expect(result.intent).toBe('add_expense');
+    expect(result.entities.paymentMethod).toBe('credito');
+    // Asegurar que NO detecta "Credito" como merchant
+    expect(result.entities.merchant).toBeUndefined();
+    // Opcional: asegurar que no detecta categoria tampoco si no hay otra
+    expect(result.entities.category).toBeUndefined();
+  });
 });
