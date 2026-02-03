@@ -112,6 +112,12 @@ const INTENT_RULES: Array<{ name: string; re: RegExp }> = [
   { name: 'correct_transaction', re: /\*\s*(\d+(?:[.,]\d+)?)/ },
   { name: 'correct_transaction', re: /\b([A-Za-zñÑáéíóúÁÉÍÓÚ\.]+\*)/ },
 
+  // Aportes a metas CON ORIGEN de fondos (detectar "de mi salario/cuenta")
+  // IMPORTANTE: Estas reglas deben ir ANTES de add_contribution simple
+  // Detecta patrones como "guardé X de mi salario en mi meta" o "aporté X de mercado pago al fondo"
+  { name: 'add_contribution_with_source', re: /\b(guardé|guarde|guardó|ahorré|ahorre|aporté|aporte|destiné|destine|puse|deposité|deposite)\s+(\d+(?:[.,]\d+)?)\s+(de|desde)\s+(mi\s+)?(salario|sueldo|cuenta|banco|mercado\s*pago|uala|ualá|brubank|naranja)/i },
+  { name: 'add_contribution_with_source', re: /\b(guardé|guarde|guardó|ahorré|ahorre|aporté|aporte|destiné|destine|puse|deposité|deposite)\b.*(en|para|a)\s+(mi\s+)?(meta|fondo|ahorro|objetivo).*(de|desde|sacado de|que saqué de)\s+(mi\s+)?(salario|sueldo|cuenta)/i },
+  
   // Aportes a metas (prioridad sobre gastos por palabras clave)
   { name: 'add_contribution', re: /\b(deposité|deposite|depositó|destiné|destine|destinó|puse|agregué|agreque|agregó)\b.*\b(para|en)\b/i }, // "puse 500 para..."
   { name: 'add_contribution', re: /\b(agregue|agregué|sume|sumé)\s+\d+/i }, // "agregué 500" (fuerte indicador de aporte si hay contexto, o edición si no)
@@ -708,6 +714,12 @@ REGLAS ADICIONALES:
 - Si el usuario pregunta "PUEDO gastar", "me alcanza", "cómo voy con el presupuesto", "tengo saldo para", responde con intent "check_budget" y extrae category (si hay), amount (si pregunta por un monto específico), month, year.
 - Si el usuario expresa un deseo de COMPRAR o AHORRAR PARA algo específico ("quiero ahorrar", "meta de", "objetivo de"), responde con intent "create_goal" y extrae amount, currency, description, goalName, categories (array de categorías), deadline (si se menciona), year, month.
 - Si el usuario menciona que YA AHORRÓ o AGREGÓ dinero a una meta existente (ej: "ahorré", "guardé", "puse", "agregué"), responde con intent "add_contribution" y extrae amount, goalName (nombre de la meta), description.
+- CRÍTICO - Si el usuario menciona que GUARDÓ/AHORRÓ dinero en una meta Y menciona DE DÓNDE SACÓ ese dinero (ej: "guardé 256000 de mi salario en mi fondo", "aporté 50000 de mercado pago a mi meta vacaciones", "puse 100000 de mi sueldo en el fondo de reserva"), responde con intent "add_contribution_with_source" y extrae:
+  * amount: monto aportado
+  * goalName: nombre de la meta de destino
+  * sourceAccount: cuenta o fuente de origen (ej: "salario", "Mercado Pago", "sueldo", "cuenta bancaria")
+  * description: descripción del aporte
+  Este intent indica que se debe registrar TANTO el aporte a la meta COMO un gasto/retiro de la cuenta origen.
 - Si el usuario menciona crear una cuenta bancaria o billetera, responde con intent "create_account" y extrae name, type, currency, primary (falso por defecto), reconciled (falso por defecto), archived (falso por defecto).
 - Si el usuario menciona crear una categoría nueva, responde con intent "create_category" y extrae name, type ("income" o "expense"), icon, color.
 - Si el usuario menciona invertir, comprar activos CON monto específico, responde con intent "invest" y extrae activo, amount, currency, periodo, tipo.
@@ -787,6 +799,12 @@ EJEMPLOS:
 - "en realidad fue en efectivo" → {"intent": "correct_transaction", "confidence": 0.99, "entities": {"account": "Efectivo", "paymentMethod": "efectivo"}}
 - "cambia la categoria a comida" → {"intent": "correct_transaction", "confidence": 0.99, "entities": {"category": "comida"}}
 - "era con Uala" → {"intent": "correct_transaction", "confidence": 0.99, "entities": {"account": "Ualá"}}
+
+EJEMPLOS DE APORTE A META CON ORIGEN DE FONDOS (add_contribution_with_source):
+- "Guardé 256000 de mi salario en mi fondo de reserva" → {"intent": "add_contribution_with_source", "confidence": 0.99, "entities": {"amount": 256000, "currency": "ARS", "goalName": "fondo de reserva", "sourceAccount": "salario", "description": "Aporte desde salario"}}
+- "Aporté 50000 de mercado pago a mi meta vacaciones" → {"intent": "add_contribution_with_source", "confidence": 0.99, "entities": {"amount": 50000, "currency": "ARS", "goalName": "vacaciones", "sourceAccount": "Mercado Pago", "description": "Aporte a vacaciones"}}
+- "Puse 100000 del sueldo en el fondo de emergencia" → {"intent": "add_contribution_with_source", "confidence": 0.99, "entities": {"amount": 100000, "currency": "ARS", "goalName": "fondo de emergencia", "sourceAccount": "sueldo", "description": "Aporte desde sueldo"}}
+- "Guardé en mi fondo de reserva 256000 de mi salario" → {"intent": "add_contribution_with_source", "confidence": 0.99, "entities": {"amount": 256000, "currency": "ARS", "goalName": "fondo de reserva", "sourceAccount": "salario", "description": "Aporte desde salario"}}
 
 EJEMPLO DE SALIDA JSON (FORMATO ESTRICTO):
 - Input: "Cobre 5000"

@@ -48,6 +48,22 @@ const cases = [
     message: '¿Cuánto gasté en Uber en octubre?',
     expectedIntent: 'query_summary',
   },
+  // === NEW: add_contribution_with_source ===
+  {
+    message: 'Guardé 256000 de mi salario en mi fondo de reserva',
+    expectedIntent: 'add_contribution_with_source',
+    expectedEntities: { amount: 256000 }
+  },
+  {
+    message: 'Aporté 50000 de mercado pago a mi meta vacaciones',
+    expectedIntent: 'add_contribution_with_source',
+    expectedEntities: { amount: 50000 }
+  },
+  {
+    message: 'guardé en mi fondo de reserva 256000 de mi salario',
+    expectedIntent: 'add_contribution_with_source',
+    expectedEntities: { amount: 256000 }
+  },
 ];
 
 
