@@ -639,10 +639,16 @@ EXTRAE TODO LO POSIBLE:
 - fecha: formato YYYY-MM-DD
 - monto: solo el número, SIN $ ni puntos de miles (ej: 15000.50)
 - moneda: ARS o USD
-- nombreContraparte: persona o empresa involucrada
+- nombreContraparte: El nombre REAL del comercio/persona.
+    - Prioriza LOGOTIPOS grandes o "Razón Social".
+    - EN TRANSFERENCIAS: Busca "Destinatario", "Para", "A nombre de", "Titular". Ej: Si dice "Destinatario: Javier Basualdo", la contraparte es "Javier Basualdo".
+    - IGNORA etiquetas genéricas como "Domicilio Comercial", "Punto de Venta", "Ingresos Brutos", "Caja", "Sucursal".
+    - Si ves "Domicilio Comercial: Farmcity", la contraparte es "Farmcity". NO uses "Domicilio Comercial".
 - categoria: Servicios, Alimentación, Transporte, Transferencias, Salud, Entretenimiento, etc.
 - empresa: nombre de la empresa emisora
-- concepto: descripción corta del movimiento
+- concepto: descripción corta del movimiento.
+    - IMPORTANTE: SOLO usa "Transferencia propia" si dice explícitamente "Cuenta propia" o el destinatario SOS VOS MISMO.
+    - Si hay un destinatario con nombre diferente, NUNCA pongas "Transferencia propia". Usa "Transferencia a [Nombre]".
 - numeroFactura: si es factura
 - metodoPago: transferencia, débito, crédito, efectivo
 
@@ -778,16 +784,19 @@ export async function analyzeDocumentText(
 
   if (heuristicResult &&
     heuristicResult.detectedFields?.monto &&
-    heuristicResult.detectedFields?.fecha) {
+    heuristicResult.detectedFields?.fecha &&
+    heuristicResult.detectedFields?.nombreContraparte && // Require merchant validation for early exit
+    !heuristicResult.detectedFields.nombreContraparte.includes('Domicilio Comercial') // Anti-hallucination check
+  ) {
     console.log('[IA] ✅ ¡Heurísticas exitosas! Usando resultado, saltando GPT-4');
-    /*
+    
     console.log('[IA] Resultado heurístico:', {
       monto: heuristicResult.detectedFields.monto,
       fecha: heuristicResult.detectedFields.fecha,
       contraparte: heuristicResult.detectedFields.nombreContraparte,
       confidence: heuristicResult.confidenceScores.global
     });
-    */
+    
     return heuristicResult;
   }
 
