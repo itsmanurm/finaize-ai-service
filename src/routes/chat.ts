@@ -196,7 +196,7 @@ r.post('/chat', async (req, res) => {
           reply = 'No pude obtener las cotizaciones del dólar en este momento. Intentá de nuevo en unos minutos.';
         }
       } else if (nlu.intent === 'help' || message.toLowerCase().includes('ayudar') || message.toLowerCase().includes('podes hacer') || message.toLowerCase().includes('puedes hacer')) {
-        reply = `¡Hola! Soy tu **Asistente Financiero con IA** 🤖✨
+        reply = `¡Hola! Soy **Fina**, tu asistente financiera con IA 🤖✨
 
 **Puedo ayudarte con:**
 
@@ -219,7 +219,7 @@ r.post('/chat', async (req, res) => {
 • Información sobre herramientas financieras
 • Educación financiera en general
 
-**Ejemplos de preguntas que podés hacer:**
+**Ejemplos de preguntas que podés hacerme:**
 
 *Sobre tus datos:*
 • "¿Cuánto gasté en comida este mes?"
