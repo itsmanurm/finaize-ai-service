@@ -117,5 +117,5 @@ export const SUSCRIPCIONES = [
     // Delivery (Membresías)
     "PedidosYa Plus", "PedidosYa+",
     "Rappi Prime", "RappiPro", "Rappi Pro",
-    "Uber One", "Uber Pass"
+    "Uber One", "Uber Pass", "Rappi", "Pedidos ya",
 ];
