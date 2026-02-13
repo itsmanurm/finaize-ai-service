@@ -3,6 +3,7 @@
  * Identifica patrones, comportamientos y genera recomendaciones personalizadas
  */
 import { SUSCRIPCIONES } from '../utils/ai-constants';
+import { analyzeInvestments, analyzeSubscriptions, analyzeAccounts, analyzePaymentMethods, calculateGoalsProgress } from './profile-analyzer-helpers';
 
 export interface Transaction {
   amount: number;
@@ -13,6 +14,7 @@ export interface Transaction {
   when?: string;
   account?: string;
   paymentMethod?: string;
+  installments?: number; // Cantidad de cuotas (si aplica)
 }
 
 export interface Budget {
@@ -53,10 +55,40 @@ export interface BudgetCompliance {
   }>;
 }
 
+export interface Investment {
+  ticker: string;
+  name: string;
+  type: 'stock' | 'crypto' | 'etf' | 'mutual_fund' | 'cedear';
+  quantity: number;
+  purchasePrice: number;
+  currentPrice?: number;
+  currency: 'ARS' | 'USD';
+  purchaseDate: string;
+}
+
+export interface RecurringSubscription {
+  serviceName: string;
+  amount: number;
+  currency: 'ARS' | 'USD';
+  frequency: 'MONTHLY' | 'YEARLY';
+  isActive: boolean;
+  nextPaymentDate: string;
+}
+
+export interface Account {
+  name: string;
+  type: 'cash' | 'bank' | 'investment';
+  currency: 'ARS' | 'USD';
+  primary?: boolean;
+}
+
 export interface FinancialProfileInput {
   transactions: Transaction[];
   budgets?: Budget[];
   goals?: Goal[];
+  investments?: Investment[];
+  subscriptions?: RecurringSubscription[];
+  accounts?: Account[];
   timeframeMonths?: number; // Análisis de últimos X meses (default: 6)
 }
 
@@ -76,6 +108,20 @@ export interface FinancialProfile {
     savingsRate: number; // Porcentaje de ahorro
     expenseToIncomeRatio: number;
     volatilityScore: number; // Qué tan variables son los gastos
+    subscriptionsCost: number;
+    subscriptionsPercentage: number;
+    investmentValue: number;
+    investmentROI: number;
+    goalsProgress: number;
+    accountsCount: number;
+    preferredPaymentMethod: string;
+    creditUsagePercentage: number;
+    installmentRisk: {
+      count: number;
+      totalMonthlyCommitment: number;
+      percentageOfIncome: number;
+      longestInstallment: number;
+    };
   };
 
   // Patrones de comportamiento detectados
@@ -86,6 +132,24 @@ export interface FinancialProfile {
     impulseScore: number; // 0-100, qué tan impulsivo es el gasto
     planningScore: number; // 0-100, qué tan planificado es
     volatilityScore: number; // 0-100, variabilidad de montos
+    preferredPaymentMethod?: {
+      method: string;
+      percentage: number;
+      insight: string;
+    };
+    accountUsage?: Array<{
+      account: string;
+      percentage: number;
+      amount: number;
+    }>;
+    investmentHealth?: {
+      totalInvested: number;
+      currentValue: number;
+      avgROI: number;
+      bestPerformer?: { ticker: string; roi: number };
+      worstPerformer?: { ticker: string; roi: number };
+      riskLevel: 'Bajo' | 'Moderado' | 'Alto';
+    };
   };
 
   // Hábitos financieros
@@ -134,7 +198,15 @@ export interface FinancialProfile {
  * Analiza el perfil financiero completo del usuario
  */
 export function analyzeFinancialProfile(input: FinancialProfileInput): FinancialProfile {
-  const { transactions, budgets = [], goals = [], timeframeMonths = 6 } = input;
+  const {
+    transactions,
+    budgets = [],
+    goals = [],
+    investments = [],
+    subscriptions = [],
+    accounts = [],
+    timeframeMonths = 6
+  } = input;
 
   // Separar ingresos y gastos
   const incomes = transactions.filter(t => t.type === 'income');
@@ -159,6 +231,21 @@ export function analyzeFinancialProfile(input: FinancialProfileInput): Financial
     ? analyzeBudgetCompliance(budgets, expenses, timeframeMonths)
     : undefined;
 
+  // Analizar suscripciones
+  const subscriptionAnalysis = analyzeSubscriptions(subscriptions, avgMonthlyExpense);
+
+  // Analizar cuentas
+  const accountAnalysis = analyzeAccounts(accounts, transactions);
+
+  // Analizar métodos de pago
+  const paymentMethodAnalysis = analyzePaymentMethods(transactions, avgMonthlyIncome);
+
+  // Analizar inversiones (peso mínimo)
+  const investmentAnalysis = analyzeInvestments(investments);
+
+  // Calcular progreso de metas
+  const goalsProgress = calculateGoalsProgress(goals);
+
   // Calcular health score
   const healthScore = calculateHealthScore({
     savingsRate,
@@ -169,7 +256,12 @@ export function analyzeFinancialProfile(input: FinancialProfileInput): Financial
     usesbudgets: habits.usesbudgets,
     hasGoals: habits.hasGoals,
     trackingConsistency: habits.trackingConsistency,
-    budgetComplianceScore: budgetCompliance?.complianceScore
+    budgetComplianceScore: budgetCompliance?.complianceScore,
+    goalsProgress,
+    subscriptionsHealth: subscriptionAnalysis.healthScore,
+    accountStrategy: accountAnalysis.hasStrategy,
+    investmentDiversity: investmentAnalysis.diversityScore,
+    installmentRisk: paymentMethodAnalysis.installmentRisk
   });
 
   // Clasificar perfil
@@ -193,7 +285,12 @@ export function analyzeFinancialProfile(input: FinancialProfileInput): Financial
     impulseScore: patterns.impulseScore,
     planningScore: patterns.planningScore,
     healthScore,
-    budgetCompliance
+    budgetCompliance,
+    goalsProgress,
+    subscriptionsHealth: subscriptionAnalysis.healthScore,
+    accountStrategy: accountAnalysis.hasStrategy,
+    creditUsagePercentage: paymentMethodAnalysis.creditPercentage,
+    installmentRisk: paymentMethodAnalysis.installmentRisk
   });
 
   // Generar recomendaciones personalizadas
@@ -211,7 +308,14 @@ export function analyzeFinancialProfile(input: FinancialProfileInput): Financial
     recurringExpenses: patterns.recurringExpenses,
     impulseScore: patterns.impulseScore,
     trackingConsistency: habits.trackingConsistency,
-    budgetCompliance
+    budgetCompliance,
+    installmentRisk: paymentMethodAnalysis.installmentRisk,
+    subscriptionsHealth: subscriptionAnalysis.healthScore,
+    subscriptionsCost: subscriptionAnalysis.monthlyCost,
+    subscriptionsPercentage: subscriptionAnalysis.percentage,
+    accountsCount: accounts.length,
+    goalsProgress,
+    investmentValue: investmentAnalysis.currentValue
   });
 
   return {
@@ -224,9 +328,23 @@ export function analyzeFinancialProfile(input: FinancialProfileInput): Financial
       avgMonthlyExpense: Math.round(avgMonthlyExpense),
       savingsRate: Math.round(savingsRate * 10) / 10,
       expenseToIncomeRatio: Math.round(expenseToIncomeRatio * 100) / 100,
-      volatilityScore: patterns.volatilityScore
+      volatilityScore: patterns.volatilityScore,
+      subscriptionsCost: subscriptionAnalysis.monthlyCost,
+      subscriptionsPercentage: subscriptionAnalysis.percentage,
+      investmentValue: investmentAnalysis.currentValue,
+      investmentROI: investmentAnalysis.avgROI,
+      goalsProgress,
+      accountsCount: accounts.length,
+      preferredPaymentMethod: paymentMethodAnalysis.preferred,
+      creditUsagePercentage: paymentMethodAnalysis.creditPercentage,
+      installmentRisk: paymentMethodAnalysis.installmentRisk
     },
-    patterns,
+    patterns: {
+      ...patterns,
+      preferredPaymentMethod: paymentMethodAnalysis.details,
+      accountUsage: accountAnalysis.distribution,
+      investmentHealth: investmentAnalysis.health
+    },
     habits,
     budgetCompliance,
     capacity,
@@ -507,6 +625,11 @@ function calculateHealthScore(params: {
   hasGoals: boolean;
   trackingConsistency: number;
   budgetComplianceScore?: number;
+  goalsProgress?: number;
+  subscriptionsHealth?: number;
+  accountStrategy?: boolean;
+  investmentDiversity?: number;
+  installmentRisk?: { count: number; percentageOfIncome: number };
 }): number {
   let score = 50; // Base
 
@@ -546,6 +669,42 @@ function calculateHealthScore(params: {
 
   // Volatilidad (-10 si es muy alta)
   if (params.volatilityScore > 80) score -= 10;
+
+  // NUEVOS FACTORES:
+
+  // Progreso en metas (+8 puntos máx)
+  if (params.goalsProgress !== undefined) {
+    if (params.goalsProgress >= 75) score += 8;
+    else if (params.goalsProgress >= 50) score += 6;
+    else if (params.goalsProgress >= 25) score += 3;
+  }
+
+  // Control de suscripciones (+5 puntos o -5)
+  if (params.subscriptionsHealth !== undefined) {
+    if (params.subscriptionsHealth >= 80) score += 5;
+    else if (params.subscriptionsHealth < 50) score -= 5;
+  }
+
+  // Uso de múltiples cuentas (+3 puntos)
+  if (params.accountStrategy) score += 3;
+
+  // Diversificación de inversiones (+3 puntos máx - peso mínimo)
+  if (params.investmentDiversity !== undefined && params.investmentDiversity > 0) {
+    if (params.investmentDiversity >= 80) score += 3;
+    else if (params.investmentDiversity >= 60) score += 2;
+    else if (params.investmentDiversity >= 40) score += 1;
+  }
+
+  // Riesgo de cuotas (-10 puntos si es alto)
+  if (params.installmentRisk) {
+    const { percentageOfIncome, count } = params.installmentRisk;
+
+    if (percentageOfIncome > 30 || count > 10) {
+      score -= 10; // Riesgo alto
+    } else if (percentageOfIncome > 20 || count > 5) {
+      score -= 5; // Riesgo moderado
+    }
+  }
 
   return Math.max(0, Math.min(100, score));
 }
@@ -589,11 +748,15 @@ function classifyProfile(params: {
  */
 function getProfileDescription(type: FinancialProfile['profileType']): string {
   const descriptions = {
-    'Ahorrador': 'Tienes un excelente control de tus finanzas y priorizas el ahorro. Mantienes tus gastos bajo control y piensas en el futuro.',
-    'Equilibrado': 'Mantienes un balance saludable entre gastos y ahorro. Tienes espacio para mejorar, pero vas por buen camino.',
-    'Gastador': 'Tus gastos están cerca o superan tus ingresos. Es momento de revisar tus hábitos y buscar áreas donde reducir.',
-    'Impulsivo': 'Realizas muchas compras pequeñas sin planificación. Considera usar presupuestos para tener mayor control.',
-    'Planificador': 'Planificas tus gastos con anticipación y usas herramientas para mantener el control. ¡Excelente gestión financiera!'
+    'Ahorrador': 'Tenés un control sólido de tus finanzas y una mentalidad orientada al futuro. Tu capacidad de ahorro es consistente y tus gastos están alineados con tus ingresos. No solo administrás bien el presente, sino que construís estabilidad a largo plazo. El próximo nivel para vos es optimizar e invertir estratégicamente lo que ya estás haciendo bien.',
+
+    'Equilibrado': 'Mantenés un buen balance entre lo que ganás, lo que gastás y lo que ahorrás. No estás en riesgo, pero todavía tenés margen para fortalecer tu estructura financiera. Con pequeños ajustes en planificación y automatización, podrías mejorar tu estabilidad y acelerar el crecimiento de tu patrimonio.',
+
+    'Gastador': 'Tus gastos consumen la mayor parte (o más) de tus ingresos, lo que reduce tu margen de maniobra y aumenta el riesgo ante imprevistos. No necesariamente es un problema grave, pero sí una señal clara de que necesitás ajustar prioridades, reducir ciertos consumos y recuperar control sobre tu flujo mensual.',
+
+    'Impulsivo': 'Tus patrones muestran compras frecuentes y poco planificadas, lo que puede dificultar el ahorro sostenido. El desafío no es ganar más, sino ordenar decisiones de gasto. Incorporar reglas simples y límites claros puede generar un cambio grande sin necesidad de recortes extremos.',
+
+    'Planificador': 'Gestionás tu dinero con estrategia y anticipación. Usás herramientas como presupuestos o metas para tomar decisiones conscientes en lugar de reaccionar mes a mes. Tenés una base financiera organizada y previsible. El siguiente paso es optimizar eficiencia y maximizar crecimiento.'
   };
   return descriptions[type];
 }
@@ -648,34 +811,96 @@ function identifyStrengthsAndImprovements(params: {
   planningScore: number;
   healthScore: number;
   budgetCompliance?: BudgetCompliance;
+  goalsProgress?: number;
+  subscriptionsHealth?: number;
+  accountStrategy?: boolean;
+  creditUsagePercentage?: number;
+  installmentRisk?: { count: number; percentageOfIncome: number };
 }): { strengths: string[]; improvements: string[] } {
   const strengths: string[] = [];
   const improvements: string[] = [];
 
-  // Fortalezas
+  // Fortalezas - TODAS con validación estricta
   if (params.savingsRate >= 15) strengths.push('Excelente capacidad de ahorro');
   if (params.expenseToIncomeRatio <= 0.8) strengths.push('Control efectivo de gastos');
-  if (params.usesbudgets) strengths.push('Uso activo de presupuestos');
-  if (params.hasGoals) strengths.push('Tienes metas financieras definidas');
+
+  // Solo si realmente usa presupuestos
+  if (params.usesbudgets) {
+    strengths.push('Uso activo de presupuestos');
+
+    // Y solo si tiene buen cumplimiento
+    if (params.budgetCompliance && params.budgetCompliance.complianceRate >= 80) {
+      strengths.push('Excelente disciplina en el cumplimiento de presupuestos');
+    }
+  }
+
+  // Solo si realmente tiene metas
+  if (params.hasGoals) {
+    strengths.push('Tienes metas financieras definidas');
+
+    // Y solo si tiene buen progreso
+    if (params.goalsProgress !== undefined && params.goalsProgress >= 60) {
+      strengths.push('Buen progreso en tus metas financieras');
+    }
+  }
+
   if (params.planningScore > params.impulseScore + 20) strengths.push('Alta capacidad de planificación');
   if (params.healthScore >= 80) strengths.push('Salud financiera sobresaliente');
 
-  // Fortaleza adicional: buena disciplina presupuestaria
-  if (params.budgetCompliance && params.budgetCompliance.complianceRate >= 80) {
-    strengths.push('Excelente disciplina en el cumplimiento de presupuestos');
+  // Suscripciones: solo si hay datos Y están bien controladas
+  if (params.subscriptionsHealth !== undefined && params.subscriptionsHealth >= 80) {
+    strengths.push('Control efectivo de suscripciones');
   }
 
-  // Áreas de mejora
+  // Cuentas: solo si realmente tiene estrategia (3+ cuentas)
+  if (params.accountStrategy) {
+    strengths.push('Buena organización con múltiples cuentas');
+  }
+
+  // Crédito: solo si realmente lo usa Y es moderado
+  if (params.creditUsagePercentage !== undefined && params.creditUsagePercentage > 0 && params.creditUsagePercentage < 30) {
+    strengths.push('Uso moderado de tarjeta de crédito');
+  }
+
+  // Cuotas: solo si tiene cuotas Y el riesgo es bajo
+  if (params.installmentRisk && params.installmentRisk.count > 0 && params.installmentRisk.percentageOfIncome < 15) {
+    strengths.push('Uso responsable de cuotas en tarjeta de crédito');
+  }
+
+  // Áreas de mejora - TODAS con validación estricta
   if (params.savingsRate < 5) improvements.push('Aumentar tu tasa de ahorro mensual');
   if (params.expenseToIncomeRatio >= 1.0) improvements.push('Reducir gastos para evitar déficit');
+
+  // Solo sugerir si NO usa
   if (!params.usesbudgets) improvements.push('Implementar presupuestos mensuales');
   if (!params.hasGoals) improvements.push('Establecer metas financieras claras');
+
   if (params.impulseScore > 70) improvements.push('Controlar compras impulsivas');
   if (params.healthScore < 40) improvements.push('Revisar urgentemente tus hábitos financieros');
 
-  // Mejora adicional: cumplimiento de presupuestos
-  if (params.budgetCompliance && params.budgetCompliance.complianceRate < 50) {
+  // Mejora de presupuestos: solo si USA presupuestos Y tiene mal cumplimiento
+  if (params.usesbudgets && params.budgetCompliance && params.budgetCompliance.complianceRate < 50) {
     improvements.push('Mejorar el cumplimiento de presupuestos o ajustar montos');
+  }
+
+  // Mejora de metas: solo si TIENE metas Y progreso bajo
+  if (params.hasGoals && params.goalsProgress !== undefined && params.goalsProgress < 30) {
+    improvements.push('Retomar el progreso en tus metas financieras');
+  }
+
+  // Suscripciones: solo si hay datos Y están descontroladas
+  if (params.subscriptionsHealth !== undefined && params.subscriptionsHealth < 60) {
+    improvements.push('Reducir o revisar tus suscripciones activas');
+  }
+
+  // Crédito: solo si realmente lo usa mucho
+  if (params.creditUsagePercentage !== undefined && params.creditUsagePercentage > 70) {
+    improvements.push('Disminuir el uso de tarjeta de crédito');
+  }
+
+  // Cuotas: solo si tiene cuotas Y el riesgo es alto
+  if (params.installmentRisk && params.installmentRisk.percentageOfIncome > 25) {
+    improvements.push('Reducir compromiso de ingresos futuros por cuotas');
   }
 
   if (strengths.length === 0) strengths.push('Estás comenzando a tomar control de tus finanzas');
@@ -702,6 +927,13 @@ function generateRecommendations(params: {
   impulseScore: number;
   trackingConsistency: number;
   budgetCompliance?: BudgetCompliance;
+  installmentRisk?: { count: number; totalMonthlyCommitment: number; percentageOfIncome: number; longestInstallment: number };
+  subscriptionsHealth?: number;
+  subscriptionsCost?: number;
+  subscriptionsPercentage?: number;
+  accountsCount?: number;
+  goalsProgress?: number;
+  investmentValue?: number;
 }): FinancialProfile['recommendations'] {
   const recommendations: FinancialProfile['recommendations'] = [];
 
@@ -939,21 +1171,24 @@ function generateRecommendations(params: {
       'Como guía simple: 70% para gastos del mes, 20% para ahorro y 10% para gustos. Si hoy estás ajustado, adaptala, pero usar una regla fija te da claridad.'
   });
 
-  // Presupuesto por suscripciones
-  const subscriptionsEstimate =
-    params.recurringExpenses && params.recurringExpenses.length > 0
-      ? params.recurringExpenses.reduce((sum, r) => sum + r.avgAmount, 0)
-      : Math.round(params.avgMonthlyExpense * 0.05);
+  // Presupuesto por suscripciones - SOLO si tiene suscripciones o están en zona gris
+  if (params.subscriptionsCost && params.subscriptionsCost > 0 ||
+    (params.subscriptionsHealth !== undefined && params.subscriptionsHealth >= 60 && params.subscriptionsHealth < 80)) {
+    const subscriptionsEstimate =
+      params.recurringExpenses && params.recurringExpenses.length > 0
+        ? params.recurringExpenses.reduce((sum, r) => sum + r.avgAmount, 0)
+        : Math.round(params.avgMonthlyExpense * 0.05);
 
-  recommendations.push({
-    priority: 'Media',
-    category: 'Reducción de gastos',
-    title: 'Creá un presupuesto específico para suscripciones',
-    description: `Las suscripciones son peligrosas porque se vuelven invisibles. Definir un tope mensual te ayuda a controlarlas. Un número razonable para tu caso podría ser ${formatCurrency(
-      subscriptionsEstimate
-    )} mensuales.`,
-    potentialSavings: Math.round(subscriptionsEstimate * 0.15)
-  });
+    recommendations.push({
+      priority: 'Media',
+      category: 'Reducción de gastos',
+      title: 'Creá un presupuesto específico para suscripciones',
+      description: `Las suscripciones pueden descontrolarse si no las monitoreás. Definir un tope mensual te ayuda a controlarlas. Un número razonable para tu caso podría ser ${formatCurrency(
+        subscriptionsEstimate
+      )} mensuales.`,
+      potentialSavings: Math.round(subscriptionsEstimate * 0.15)
+    });
+  }
 
   // ----------------------------
   // 4) METAS
@@ -1054,23 +1289,7 @@ function generateRecommendations(params: {
     });
   }
 
-  // Lista de deseos con fecha
-  recommendations.push({
-    priority: 'Media',
-    category: 'Reducción de gastos',
-    title: 'Usá una lista de deseos con fecha de revisión',
-    description:
-      'En vez de comprar al instante, anotá el producto y poné una fecha para revisarlo. Muchísimas compras pierden urgencia con el tiempo y terminás gastando mejor.'
-  });
-
-  // Poner fricción a compras online
-  recommendations.push({
-    priority: 'Media',
-    category: 'Reducción de gastos',
-    title: 'Poné fricción a las compras online',
-    description:
-      'Sacar tarjetas guardadas o desactivar pagos rápidos reduce compras impulsivas sin depender solo de fuerza de voluntad.'
-  });
+  // ELIMINADAS: Recomendaciones genéricas que no aportan valor personalizado
 
   // ----------------------------
   // 8) TRACKING
@@ -1086,7 +1305,93 @@ function generateRecommendations(params: {
   }
 
   // ----------------------------
-  // 9) INGRESOS / CRECIMIENTO
+  // 9) RIESGO DE CUOTAS - NUEVA RECOMENDACIÓN ⭐
+  // ----------------------------
+  if (params.installmentRisk) {
+    const { count, totalMonthlyCommitment, percentageOfIncome, longestInstallment } = params.installmentRisk;
+
+    // Alta prioridad si compromete >30% del ingreso
+    if (percentageOfIncome > 30) {
+      recommendations.push({
+        priority: 'Alta',
+        category: 'Reducción de gastos',
+        title: '⚠️ Cuotas comprometiendo tus ingresos futuros',
+        description: `Tenés ${count} compras en cuotas que te comprometen $${totalMonthlyCommitment}/mes (${percentageOfIncome}% de tus ingresos). Esto limita tu capacidad de ahorro y te hace vulnerable a imprevistos. Evitá nuevas compras en cuotas hasta reducir este compromiso.`,
+        potentialSavings: 0
+      });
+    }
+    // Prioridad media si tiene muchas cuotas
+    else if (count > 5) {
+      recommendations.push({
+        priority: 'Media',
+        category: 'Planificación',
+        title: 'Controlá tus compras en cuotas',
+        description: `Tenés ${count} compras en cuotas activas. Aunque hoy es manejable ($${totalMonthlyCommitment}/mes), tené cuidado de no agregar más cuotas. Considerá comprar en efectivo o débito para tener más flexibilidad.`
+      });
+    }
+
+    // Cuota muy larga (>12 meses)
+    if (longestInstallment > 12) {
+      recommendations.push({
+        priority: 'Media',
+        category: 'Reducción de gastos',
+        title: 'Cuotas muy largas limitan tu flexibilidad',
+        description: `Tu compra en ${longestInstallment} cuotas te compromete por más de un año. Evitá cuotas tan largas: si no podés pagarlo en 6-12 meses, probablemente no deberías comprarlo.`
+      });
+    }
+  }
+
+  // ----------------------------
+  // 10) SUSCRIPCIONES - NUEVA RECOMENDACIÓN ⭐
+  // ----------------------------
+  if (params.subscriptionsPercentage !== undefined && params.subscriptionsPercentage > 15) {
+    recommendations.push({
+      priority: 'Alta',
+      category: 'Reducción de gastos',
+      title: 'Reducir suscripciones activas',
+      description: `Tus suscripciones representan el ${params.subscriptionsPercentage}% de tus gastos ($${params.subscriptionsCost}/mes). Revisá cuáles realmente usás y cancelá las que no. Un objetivo saludable es mantenerlas bajo el 10% de tus gastos.`,
+      potentialSavings: Math.round((params.subscriptionsCost || 0) * 0.3)
+    });
+  }
+
+  // ----------------------------
+  // 11) CUENTAS - NUEVA RECOMENDACIÓN ⭐
+  // ----------------------------
+  if (params.accountsCount !== undefined && params.accountsCount === 1) {
+    recommendations.push({
+      priority: 'Media',
+      category: 'Planificación',
+      title: 'Considerá usar múltiples cuentas para organizar',
+      description: 'Tener cuentas separadas (ej: gastos diarios, ahorro, emergencias) te ayuda a no mezclar plata y mantener mejor control. No necesitás bancos diferentes, podés usar cuentas virtuales o apps como MercadoPago.'
+    });
+  }
+
+  // ----------------------------
+  // 12) METAS - NUEVA RECOMENDACIÓN ⭐
+  // ----------------------------
+  if (params.goalsProgress !== undefined && params.goalsProgress < 30 && params.hasGoals) {
+    recommendations.push({
+      priority: 'Media',
+      category: 'Planificación',
+      title: 'Retomar el progreso en tus metas',
+      description: `Tus metas tienen un progreso del ${params.goalsProgress}%. Revisá si los montos son realistas o si necesitás ajustar las fechas. A veces es mejor una meta más chica que avance, que una grande estancada.`
+    });
+  }
+
+  // ----------------------------
+  // 13) INVERSIONES - SUGERENCIA SUAVE ⭐
+  // ----------------------------
+  if (params.savingsRate > 20 && (params.investmentValue === undefined || params.investmentValue === 0)) {
+    recommendations.push({
+      priority: 'Baja',
+      category: 'Inversión',
+      title: 'Considerá invertir parte de tus ahorros',
+      description: 'Tenés una excelente capacidad de ahorro. Podrías considerar invertir una parte en instrumentos de bajo riesgo (como fondos comunes de inversión o plazos fijos) para que tu dinero trabaje para vos. Empezá con montos chicos para familiarizarte.'
+    });
+  }
+
+  // ----------------------------
+  // 14) INGRESOS / CRECIMIENTO
   // ----------------------------
   recommendations.push({
     priority: 'Media',
