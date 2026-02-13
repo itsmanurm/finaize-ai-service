@@ -54,6 +54,11 @@ export const SUSCRIPCIONES = [
     "Valorant", "VP Valorant",
     "Roblox", "Roblox Premium", "Robux",
 
+    // Delivery (Membresías)
+    "Rappi", "Rappi Prime", "RappiPro", "Rappi Pro",
+    "PedidosYa", "Pedidos Ya", "PedidosYa Plus", "PedidosYa+",
+    "Uber One", "Uber Pass",
+
     // Deportes
     "F1 TV", "F1TV",
     "NBA League Pass", "NBA Pass",
@@ -70,52 +75,129 @@ export const SUSCRIPCIONES = [
     "Perplexity", "Perplexity AI",
     "Grok",
     "T3.chat",
+    "Blackbox AI",
 
     // IA para código
     "Cursor",
     "JetBrains", "JetBrains AI",
     "Tabnine",
     "Codeium",
-    "Blackbox AI",
+    "Windsurf",
+    "TRAE AI",
+
+    // IA creativa
+    "Midjourney",
+    "Krea AI",
+    "Runway", "RunwayML",
+    "Pika", "Pika Labs",
+    "ElevenLabs",
+    "Synthesia",
+
+    // Diseño / Creatividad
+    "Adobe Creative Cloud", "Adobe CC", "Adobe Photography", "Adobe",
+    "Photoshop", "Adobe Photoshop",
+    "Illustrator", "Adobe Illustrator",
+    "Premiere Pro", "Adobe Premiere",
+    "After Effects",
+    "Canva", "Canva Pro",
+    "Figma", "FigJam", "Figma Professional",
+    "Framer",
+    "Webflow",
+    "Picsart",
+    "Clipchamp",
+    "Miro",
 
     // Productividad / Trabajo
-    "Zoom", "Zoom Video",
-    "Slack",
-    "Trello", "Trello Gold", "Trello Premium",
-    "Notion", "Notion Personal", "Notion Team", "Notion AI",
-    "Evernote", "Evernote Personal",
+    "Notion", "Notion Plus", "Notion AI", "Notion Personal", "Notion Team",
+    "Microsoft 365", "Office 365", "MS 365", "Microsoft Office",
+    "Google Workspace", "G Suite",
+    "Apple One",
+    "Zoom", "Zoom Pro", "Zoom Video",
+    "Slack", "Slack Pro",
+    "Discord", "Discord Nitro",
+    "Trello", "Trello Premium", "Trello Gold",
+    "Asana",
+    "ClickUp", "ClickUp Pro",
+    "Todoist", "Todoist Pro",
+    "Evernote", "Evernote Premium", "Evernote Personal",
+    "IFTTT",
+    "LinkedIn Premium", "Linkedin",
+
+    // Almacenamiento
+    "Google One", "Google Storage",
+    "Google Drive",
     "Dropbox", "Dropbox Plus",
-    "Google One", "Google Storage", "Google Drive",
+    "Mega", "MEGA",
     "iCloud", "iCloud+", "Apple iCloud",
-    "Microsoft 365", "Office 365", "Microsoft Office",
-    "Canva", "Canva Pro",
-    "Adobe", "Adobe Creative Cloud", "Adobe CC", "Adobe Photography",
-    "Figma", "Figma Professional",
-    "Miro",
-    "Linkedin Premium", "Linkedin",
-    "GitHub",
+    "OneDrive", "One Drive",
+    "Yandex 360",
+
+    // Hosting / Dev / Infra
+    "GitHub", "GitHub Pro",
     "Vercel",
+    "Supabase",
+    "Sanity",
+    "Bubble", "Bubble.io",
+    "Starlink",
+    "Nic.ar",
+    "Namecheap",
+    "Cloudflare",
     "Heroku",
     "DigitalOcean", "Digital Ocean",
     "AWS", "Amazon Web Services",
 
-    // Diarios / Noticias
-    "La Nacion", "Diario La Nacion", "La Nación",
-    "Clarin", "Diario Clarin", "Clarín",
+    // Seguridad / Privacidad
+    "1Password",
+    "Bitwarden",
+    "NordVPN",
+    "ExpressVPN",
+    "Proton", "Proton VPN",
+
+    // Educación / Aprendizaje
+    "Udemy",
+    "Coursera", "Coursera Plus",
+    "Platzi",
+    "Domestika",
+    "Crehana",
+    "Skillshare",
+    "Duolingo", "Duolingo Plus", "Duolingo Super",
+    "Busuu",
+    "Brilliant",
+    "Mimo",
+    "Kindle Unlimited",
+    "Amazon Audible", "Audible",
+
+    // Fitness / Salud
+    "Fitbit Premium",
+    "Strava", "Strava Summit", "Strava Subscription",
+    "Nike Training Club",
+    "Calm", "Calm Premium",
+    "Headspace", "Headspace Plus",
+
+    // Medios / Noticias
+    "Medium Membership", "Medium",
+    "New York Times", "NYTimes", "The New York Times",
+    "The Economist",
+    "Globo",
+    "Clarín Digital", "Diario Clarin", "Clarín",
+    "La Nación", "La Nación Premium", "Diario La Nacion",
     "Infobae",
-    "The New York Times", "NYTimes",
     "The Washington Post",
     "Financial Times",
-    "The Economist",
-    "Medium", "Medium Membership",
 
-    // Bienestar (apps)
-    "Headspace",
-    "Calm",
-    "Strava", "Strava Subscription",
+    // Adultos
+    "OnlyFans",
+    "Patreon",
+    "Brazzers",
+    "Pornhub",
 
-    // Delivery (Membresías)
-    "PedidosYa Plus", "PedidosYa+",
-    "Rappi Prime", "RappiPro", "Rappi Pro",
-    "Uber One", "Uber Pass", "Rappi", "Pedidos ya",
+    // Finanzas / Utilidades
+    "Impuestito", "Impuestito.org",
+    "Mercado Libre",
+    "Mercado Pago",
+
+    // Sistema / Otros
+    "Gasti Pro", "Gasti Pro ARS", "Gasti Pro USD",
+    "TEST",
+    "Solicitar nueva suscripción"
 ];

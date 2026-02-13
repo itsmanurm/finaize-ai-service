@@ -2,6 +2,7 @@
  * Sistema completo de análisis de perfil financiero
  * Identifica patrones, comportamientos y genera recomendaciones personalizadas
  */
+import { SUSCRIPCIONES } from '../utils/ai-constants';
 
 export interface Transaction {
   amount: number;
@@ -81,7 +82,7 @@ export interface FinancialProfile {
   patterns: {
     spendingTiming: 'Inicio de mes' | 'Fin de mes' | 'Distribuido' | 'Irregular';
     topCategories: Array<{ category: string; percentage: number; amount: number }>;
-    recurringExpenses: Array<{ merchant: string; frequency: string; avgAmount: number }>;
+    recurringExpenses: Array<{ merchant: string; frequency: string; avgAmount: number; type: string }>;
     impulseScore: number; // 0-100, qué tan impulsivo es el gasto
     planningScore: number; // 0-100, qué tan planificado es
     volatilityScore: number; // 0-100, variabilidad de montos
@@ -299,11 +300,16 @@ function detectSpendingPatterns(expenses: Transaction[]): FinancialProfile['patt
 
   const recurringExpenses = Array.from(merchantFrequency.entries())
     .filter(([_, data]) => data.count >= 3)
-    .map(([merchant, data]) => ({
-      merchant,
-      frequency: data.count >= 10 ? 'Muy frecuente' : data.count >= 5 ? 'Frecuente' : 'Ocasional',
-      avgAmount: Math.round(data.total / data.count)
-    }))
+    .map(([merchant, data]) => {
+      // Check if it's a known subscription
+      const isSubscription = SUSCRIPCIONES.some((sub: string) => merchant.toLowerCase().includes(sub.toLowerCase()));
+      return {
+        merchant,
+        frequency: data.count >= 10 ? 'Muy frecuente' : data.count >= 5 ? 'Frecuente' : 'Ocasional',
+        avgAmount: Math.round(data.total / data.count),
+        type: isSubscription ? 'subscription' : 'habit' // Distinguish type
+      };
+    })
     .sort((a, b) => b.avgAmount - a.avgAmount)
     .slice(0, 5);
 
@@ -872,7 +878,7 @@ function generateRecommendations(params: {
   if (params.topCategories.length > 0 && params.topCategories[0].percentage > 30) {
     const topCat = params.topCategories[0];
     const excludedCategories = ['ahorro', 'inversión', 'inversion', 'transferencia', 'plazos fijos', 'acciones'];
-    
+
     // Only suggest optimizing if it's not a savings/investment category
     if (!excludedCategories.some(exc => topCat.category.toLowerCase().includes(exc))) {
       recommendations.push({

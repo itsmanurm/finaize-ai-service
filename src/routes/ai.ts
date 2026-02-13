@@ -227,9 +227,10 @@ r.post('/analyze-profile', async (req, res) => {
 
     // Send notifications for detected recurring subscriptions
     if (userId && profile.patterns?.recurringExpenses) {
-      // Filter for likely subscriptions (frequent + regular amount)
+      // Filter for likely subscriptions (frequent + regular amount + MATCHES WHITELIST)
       const likelySubscriptions = profile.patterns.recurringExpenses.filter(
-        expense => expense.frequency === 'Muy frecuente' || expense.frequency === 'Frecuente'
+        expense => (expense.frequency === 'Muy frecuente' || expense.frequency === 'Frecuente') &&
+          expense.type === 'subscription'
       );
 
       for (const subscription of likelySubscriptions.slice(0, 3)) { // Max 3 notifications per analysis
