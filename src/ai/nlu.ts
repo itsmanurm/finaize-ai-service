@@ -200,7 +200,64 @@ export async function parseMessage(message: string, context?: any): Promise<NLUR
       // Si es un ingreso, evitar categorías de gasto comunes mal detectadas
       const commonWallets = ['mercado pago', 'mercado', 'uala', 'brubank', 'personal pay', 'naranja', 'lemon'];
       if (intent === 'add_income' && commonWallets.includes(out.category.toLowerCase())) {
-        out.category = 'Ingreso';
+        out.category = 'Salario';
+      }
+
+      if (intent === 'add_income') {
+        const incomeSafe = new Set([
+          'ingreso',
+          'ingresos',
+          'salario',
+          'salarios',
+          'intereses',
+          'transferencias',
+          'inversiones',
+          'honorarios',
+          'venta',
+          'ventas',
+          'regalo',
+          'reembolso',
+          'premio',
+          'dividendos',
+          'renta',
+          'alquiler',
+          'bono'
+        ]);
+        const expenseOnly = new Set([
+          'impuesto',
+          'impuestos',
+          'cargos bancarios',
+          'suscripciones',
+          'combustible',
+          'supermercado',
+          'comidas',
+          'compras',
+          'transporte',
+          'salud',
+          'educacion',
+          'educación',
+          'entretenimiento',
+          'servicios',
+          'seguros'
+        ]);
+        const normalized = out.category.toLowerCase().trim();
+        const expenseHints = [
+          'impuest',
+          'afip',
+          'arba',
+          'rentas',
+          'municipalidad',
+          'dgr',
+          'iibb',
+          'ingresos brutos',
+          'iva',
+          'cargo bancario',
+          'comision'
+        ];
+        const looksExpense = expenseOnly.has(normalized) || expenseHints.some(h => normalized.includes(h));
+        if (!incomeSafe.has(normalized) && looksExpense) {
+          out.category = 'Salario';
+        }
       }
     }
     // activo normalización
@@ -762,8 +819,8 @@ EJEMPLOS:
 - "Compré tornillos por 500" → {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 500, "currency": "ARS", "category": "Tornillos", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
 - "Saqué 5000 del cajero" → {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 5000, "currency": "ARS", "category": "Retiro", "paymentMethod": "efectivo", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
 - "Pagué 2000 con Mercado Pago" → {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 2000, "currency": "ARS", "account": "Mercado Pago", "paymentMethod": "debito", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
-- "Cobre 5000 en Mercado Pago" → {"intent": "add_income", "confidence": 0.99, "entities": {"amount": 5000, "currency": "ARS", "account": "Mercado Pago", "category": "Ingreso", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
-- "Me transfirieron 15000 al Brubank" → {"intent": "add_income", "confidence": 0.99, "entities": {"amount": 15000, "currency": "ARS", "account": "Brubank", "category": "Ingreso", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+- "Cobre 5000 en Mercado Pago" → {"intent": "add_income", "confidence": 0.99, "entities": {"amount": 5000, "currency": "ARS", "account": "Mercado Pago", "category": "Salario", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
+- "Me transfirieron 15000 al Brubank" → {"intent": "add_income", "confidence": 0.99, "entities": {"amount": 15000, "currency": "ARS", "account": "Brubank", "category": "Salario", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
 - "Cobré el sueldo 120000" → {"intent": "add_income", "confidence": 0.99, "entities": {"amount": 120000, "currency": "ARS", "source": "sueldo", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
 - "Pagué la luz 8500" → {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 8500, "currency": "ARS", "category": "luz", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}
 - "Fui al supermercado y gasté 2.300" → {"intent": "add_expense", "confidence": 0.99, "entities": {"amount": 2300, "currency": "ARS", "category": "supermercado", "day": ${now.getDate()}, "month": ${currentMonth}, "year": ${currentYear}}}

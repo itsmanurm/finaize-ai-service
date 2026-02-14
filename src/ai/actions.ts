@@ -172,7 +172,7 @@ export async function actionAddIncome(payload: {
     const txPayload = {
       amount: Math.abs(amount),
       description: 'Ingreso registrado por IA',
-      category: category || 'Ingresos', // Default category
+      category: category || 'Salario', // Default category
       account: targetAccount.name,
       transactionType: 'ingreso',
       paymentMethod: 'efectivo', // Default
